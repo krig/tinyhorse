@@ -125,10 +125,14 @@ class SDL2
   fun ref fill_rect(rect: (SDLRect val | None)) =>
     renderer.fill_rect(rect)
 
-  fun ref draw_texture(id: I32, rect: SDLRect val) =>
+  fun ref draw_texture(id: I32, rect: SDLRect val, flip: U32 = SDLFlags.flip_none()) =>
     try
       let tex = textures(id)?
-      renderer.draw_texture(tex, rect)
+      if flip != SDLFlags.flip_none() then
+        renderer.draw_texture_flip(tex, rect, flip)
+      else
+        renderer.draw_texture(tex, rect)
+      end
     end
 
   fun ref present() =>
@@ -208,6 +212,18 @@ class SDLRenderer
     @SDL_RenderCopy(renderer, texture.texture,
     MaybePointer[_SDLRect val](consume srcrect),
     MaybePointer[_SDLRect val](rect.rect))
+
+  fun ref draw_texture_flip(texture: SDLTexture, rect: SDLRect val, flip: U32) =>
+    let srcrect: _SDLRect trn = recover trn _SDLRect(0, 0, 0, 0) end
+    var format: U32 = 0
+    var access: I32 = 0
+    @SDL_QueryTexture(texture.texture, addressof format, addressof access, addressof srcrect.w, addressof srcrect.h)
+    @SDL_RenderCopyEx(renderer, texture.texture,
+    MaybePointer[_SDLRect val](consume srcrect),
+    MaybePointer[_SDLRect val](rect.rect),
+    0.0,
+    MaybePointer[_SDLPoint val].none(),
+    flip)
 
 
 class SDLQuit

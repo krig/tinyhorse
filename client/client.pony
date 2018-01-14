@@ -17,6 +17,7 @@ class Pony
   var y: I32 = 0
   // movement dir, 0 = standing still, 1 = right, -1 = left
   var dir: I32 = 0
+  var moved: Bool = false
   var _frame: I32 = 0
   var _fcnt: I32 = 0
   var _controller: PonyController
@@ -28,11 +29,15 @@ class Pony
 
   fun draw(sdl: SDL2) =>
     let img = _controller.framebase() + _frame
-    sdl.draw_texture(img, recover val SDLRect(x, y, SpriteW(), SpriteH()) end)
+    if dir < 0 then
+      sdl.draw_texture(img, recover val SDLRect(x, y, SpriteW(), SpriteH()) end, SDLFlags.flip_horizontal())
+    else
+      sdl.draw_texture(img, recover val SDLRect(x, y, SpriteW(), SpriteH()) end)
+    end
 
   fun ref tick() =>
     // only update animation when moving
-    if dir != 0 then
+    if moved then
       _fcnt = _fcnt + 1
       if _fcnt > 1 then
         _fcnt = 0
@@ -59,7 +64,12 @@ class Pony
   fun ref walk(x': I32, y': I32) =>
     x = x + x'
     y = y + y'
-    dir = if (x' == 0) and (y' == 0) then 0 elseif x' < 0 then -1 else 1 end
+    if x' < 0 then
+      dir = -1
+    elseif x' > 0 then
+      dir = 1
+    end
+    moved = (x' != 0) or (y' != 0)
 
 
 interface PonyController
