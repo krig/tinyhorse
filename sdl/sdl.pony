@@ -13,6 +13,7 @@ use @SDL_SetRenderDrawColor[I32](renderer: Pointer[_SDLRenderer], r: U8, g: U8, 
 use @SDL_RenderFillRect[I32](renderer: Pointer[_SDLRenderer], rect: MaybePointer[_SDLRect val])
 use @IMG_LoadTexture[Pointer[_SDLTexture]](renderer: Pointer[_SDLRenderer], file: Pointer[U8] tag)
 use @SDL_QueryTexture[I32](texture: Pointer[_SDLTexture], format: Pointer[U32], access: Pointer[I32], w: Pointer[I32], h: Pointer[I32])
+use @SDL_PollEvent[I32](event: MaybePointer[_SDLKeyboardEvent])
 
 use @SDL_RenderCopy[I32](renderer: Pointer[_SDLRenderer],
   texture: Pointer[_SDLTexture],
@@ -46,6 +47,39 @@ struct _SDLPoint
     x = x1
     y = y1
 
+// Total 56 bytes
+struct _SDLKeyboardEvent
+  // 30 bytes
+  var type1: U32 = 0
+  var timestamp: U32 = 0
+  var windowID: U32 = 0
+  var state: U8 = 0
+  var repeat1: U8 = 0
+  var padding2: U8 = 0
+  var padding3: U8 = 0
+  var scancode: U32 = 0
+  var sym: U32 = 0
+  var mod: U16 = 0
+  var unused: U32 = 0
+  // 26 bytes
+  var pad1: U64 = 0
+  var pad2: U64 = 0
+  var pad3: U64 = 0
+  var pad4: U16 = 0
+
+primitive _SDLEvents
+  fun quit(): U32 => 0x100
+  fun keydown(): U32 => 0x300
+  fun keyup(): U32 => 0x301
+
+primitive SDLKeyCodes
+  fun escape(): U32 => 27
+  fun space(): U32 => 32
+  fun left(): U32 => (1 << 30) + 80
+  fun right(): U32 => (1 << 30) + 79
+  fun down(): U32 => (1 << 30) + 81
+  fun up(): U32 => (1 << 30) + 82
+
 primitive _SDLWindow
 primitive _SDLRenderer
 primitive _SDLTexture
@@ -71,14 +105,15 @@ primitive SDLFlags
   fun flip_horizontal(): U32 => 0x1
   fun flip_vertical(): U32 => 0x2
 
+
 class SDL2
   var window: SDLWindow
   var renderer: SDLRenderer
   var textures: Map[I32, SDLTexture] = Map[I32, SDLTexture]
 
-  new create(flags: U32, title: String val) =>
+  new create(flags: U32, title: String val, w: I32 = 640, h: I32 = 480) =>
     @SDL_Init(flags)
-    window = SDLWindow(title)
+    window = SDLWindow(title, 100, 100, w, h)
     renderer = SDLRenderer(window)
 
   fun ref clear() =>
@@ -108,15 +143,31 @@ class SDL2
       textures.insert(id, renderer.load_texture(file)?)?
     end
 
+  fun ref poll_events(): Array[SDLEvent] iso^ =>
+    let events: Array[SDLEvent] iso = []
+    var e: _SDLKeyboardEvent ref = _SDLKeyboardEvent
+    var rc: I32 = 0
+    rc = @SDL_PollEvent(MaybePointer[_SDLKeyboardEvent](e))
+    while rc != 0 do
+      match e.type1
+        | _SDLEvents.quit() => events.push(SDLQuit)
+        | _SDLEvents.keydown() => if e.repeat1 == 0 then events.push(SDLKeyDown(e.sym)) end
+        | _SDLEvents.keyup() => if e.repeat1 == 0 then events.push(SDLKeyUp(e.sym)) end
+      end
+      rc = @SDL_PollEvent(MaybePointer[_SDLKeyboardEvent](e))
+    end
+    consume events
+
 
 class SDLWindow
   var window: Pointer[_SDLWindow]
 
-  new create(title: String box, x: I32 = 100, y: I32 = 100, w: I32 = 640, h: I32 = 480, flags: U32 = SDLFlags.window_shown()) =>
+  new create(title: String box, x: I32 = -1, y: I32 = -1, w: I32 = 640, h: I32 = 480, flags: U32 = SDLFlags.window_shown()) =>
     window = @SDL_CreateWindow(title.cstring(), x, y, w, h, flags)
 
   fun ref destroy() =>
     @SDL_DestroyWindow(window)
+
 
 class SDLRenderer
   var renderer: Pointer[_SDLRenderer]
@@ -158,3 +209,19 @@ class SDLRenderer
     MaybePointer[_SDLRect val](consume srcrect),
     MaybePointer[_SDLRect val](rect.rect))
 
+
+class SDLQuit
+  new iso create() =>
+    None
+
+class SDLKeyUp
+  let sym: U32
+  new iso create(sym': U32) =>
+    sym = sym'
+
+class SDLKeyDown
+  let sym: U32
+  new iso create(sym': U32) =>
+    sym = sym'
+
+type SDLEvent is (SDLQuit | SDLKeyUp | SDLKeyDown)
