@@ -26,13 +26,13 @@ actor Game
                           _game.loop()
                           true
                         fun ref cancel(timer:Timer) => None
-                      end, 0, 33_000_000) // 33ms timeout
+                      end, 0, 50_000_000) // 50ms timeout
     render_loop = timer
     timers(consume timer)
 
   be loop() =>
    sdl.clear()
-   sdl.set_draw_color(0, 0, 255)
+   sdl.set_draw_color(92, 111, 57)
    sdl.fill_rect(None)
    sdl.set_draw_color(255, 0, 0)
    let rect: SDLRect trn = recover trn SDLRect(xpos, 100, 200, 200) end

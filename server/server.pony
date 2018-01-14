@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "time"
+use "../gamecore"
 
 actor Main
   new create(env: Env) =>
@@ -161,15 +162,7 @@ class Move is Event
   fun name(): String val => _name
 
   fun send(player: Player) =>
-    let cmd = recover trn String(64) end
-    cmd.append("move ")
-    cmd.append(_name)
-    cmd.append(" ")
-    cmd.append(_x.string())
-    cmd.append(" ")
-    cmd.append(_y.string())
-    cmd.append("\n")
-    player.send(consume cmd)
+    player.send(Fmt("move % % %\n")(_name)(_x)(_y).string())
 
 class Say is Event
   let _name: String val
@@ -181,13 +174,7 @@ class Say is Event
   fun name(): String val => _name
 
   fun send(player: Player) =>
-    let cmd = recover trn String(64) end
-    cmd.append("say ")
-    cmd.append(_name)
-    cmd.append(" ")
-    cmd.append(_msg)
-    cmd.append("\n")
-    player.send(consume cmd)
+    player.send(Fmt("say % %\n")(_name)(_msg).string())
 
 class Bye is Event
   let _name: String val
@@ -197,11 +184,7 @@ class Bye is Event
   fun name(): String val => _name
 
   fun send(player: Player) =>
-    let cmd = recover trn String(64) end
-    cmd.append("bye ")
-    cmd.append(_name)
-    cmd.append("\n")
-    player.send(consume cmd)
+    player.send(Fmt("bye %\n")(_name).string())
 
 
 actor GameServer is TimerNotify
@@ -218,13 +201,6 @@ actor GameServer is TimerNotify
     let game_loop = Timer(Ticker(this), Nanos.from_millis(100), Nanos.from_millis(100))
     _loop = game_loop
     _timers(consume game_loop)
-
-  fun ref get_player(name: String val): Player ? =>
-    try
-      _players(name)?
-    else
-      error
-    end
 
   be connect(name: String val, conn: TCPConnection tag) =>
     try
@@ -246,13 +222,13 @@ actor GameServer is TimerNotify
 
   be move(name: String val, x: I32, y: I32) =>
     try
-      get_player(name)?.move(x, y)
+      _players(name)?.move(x, y)
       _events.push(Move(name, x, y))
     end
 
   be say(name: String val, msg: String val) =>
     try
-      get_player(name)?.say(msg)
+      _players(name)?.say(msg)
       _events.push(Say(name, msg))
     end
 
@@ -279,8 +255,3 @@ actor GameServer is TimerNotify
       end
     end
     _events.clear()
-
-  fun ref quit() =>
-    match _loop
-      | let l: Timer tag => _timers.cancel(l)
-    end
