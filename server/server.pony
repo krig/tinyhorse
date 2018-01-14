@@ -61,7 +61,7 @@ class GameConnection is TCPConnectionNotify
   fun ref _parse_loop() =>
     while true do
       let cmdend = try _buf.find("\n")? else break end
-      let cmd = _buf.substring(0, cmdend - 1)
+      let cmd = _buf.substring(0, cmdend)
       _buf.cut_in_place(0, cmdend + 1)
       _parse(consume cmd)
     end
@@ -81,7 +81,7 @@ class GameConnection is TCPConnectionNotify
         _gameserver.bye(_id)
       end
     else
-      _env.out.print("parse error from " + _id)
+      _env.out.print("parse error from " + _id + ": " + cmd)
     end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso, times: USize): Bool =>
@@ -92,6 +92,7 @@ class GameConnection is TCPConnectionNotify
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print(_id + " disconnected")
+    _gameserver.bye(_id)
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     _env.out.print("connect failed")
@@ -211,6 +212,7 @@ actor GameServer is TimerNotify
           if player.msgtimeout > 0 then
             Say(pn, player.msg.clone()).send(new_player)
           end
+          Move(name, new_player.x, new_player.y).send(player)
         end
       end
     else
@@ -230,6 +232,7 @@ actor GameServer is TimerNotify
     end
 
   be bye(name: String val) =>
+    Fmt("% is leaving")(name).print(_env.out)
     try
       (_, let player) = _players.remove(name)?
       _events.push(Bye(name))
