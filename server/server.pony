@@ -60,10 +60,7 @@ class GameConnection is TCPConnectionNotify
 
   fun ref _parse_loop() =>
     while true do
-      let cmdend = try _buf.find("\n")? else -1 end
-      if cmdend < 0 then
-        break
-      end
+      let cmdend = try _buf.find("\n")? else break end
       let cmd = _buf.substring(0, cmdend - 1)
       _buf.cut_in_place(0, cmdend + 1)
       _parse(consume cmd)
