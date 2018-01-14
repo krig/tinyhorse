@@ -1,5 +1,7 @@
 # tiny horse
 
+!["screenshot"](https://github.com/krig/tinyhorse/raw/master/data/tinyhorse.jpg "screenshot")
+
 A multiplayer "game" written as a small example of pony.
 
 Requires `SDL2` and `SDL2_image`.
