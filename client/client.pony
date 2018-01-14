@@ -1,7 +1,7 @@
-use "time"
-use "random"
-use "net"
 use "collections"
+use "net"
+use "random"
+use "time"
 use "../sdl"
 use "../gamecore"
 
@@ -136,7 +136,9 @@ actor Game
     sdl.load_texture("data/pony_03.png", 3)
     let mt = MT(Time.millis())
     _player = PlayerPony
-    _ponies.push(Pony((mt.next() % 640).abs().i32(), (mt.next() % 480).abs().i32(), _player))
+    let rx = (mt.next() % (WinW() - (SpriteW() * 2)).u64()).abs().i32() + SpriteW()
+    let ry = (mt.next() % (WinH() - (SpriteH() * 2)).u64()).abs().i32() + SpriteH()
+    _ponies.push(Pony(rx, ry, _player))
 
     let rtimer = Timer(object iso
                         let _game:Game = this

@@ -3,6 +3,7 @@ use "net"
 use "time"
 use "../gamecore"
 
+
 actor Main
   new create(env: Env) =>
     let gameserver = GameServer(env)
@@ -11,6 +12,7 @@ actor Main
     else
       env.out.print("Unable to use the network :(")
     end
+
 
 class Listener is TCPListenNotify
   let _env: Env
@@ -35,6 +37,7 @@ class Listener is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     GameConnection(_env, _gameserver)
+
 
 class GameConnection is TCPConnectionNotify
   let _env: Env
@@ -97,15 +100,6 @@ class GameConnection is TCPConnectionNotify
   fun ref connect_failed(conn: TCPConnection ref) =>
     _env.out.print("connect failed")
 
-class Ticker is TimerNotify
-  let _server: GameServer tag
-
-  new iso create(server: GameServer tag) =>
-    _server = server
-
-  fun apply(timer: Timer, count: U64): Bool =>
-    _server.tick()
-    true
 
 class Player
   let _conn: TCPConnection tag
@@ -185,6 +179,17 @@ class Bye is Event
     player.send(Fmt("bye %\n")(_name).string())
 
 
+class Ticker is TimerNotify
+  let _server: GameServer tag
+
+  new iso create(server: GameServer tag) =>
+    _server = server
+
+  fun apply(timer: Timer, count: U64): Bool =>
+    _server.tick()
+    true
+
+
 actor GameServer is TimerNotify
   let _env: Env
   let _players: Map[String val, Player] = Map[String val, Player]
@@ -196,7 +201,7 @@ actor GameServer is TimerNotify
   new create(env: Env) =>
     _env = env
     _timers = Timers
-    let game_loop = Timer(Ticker(this), Nanos.from_millis(100), Nanos.from_millis(100))
+    let game_loop = Timer(Ticker(this), Nanos.from_millis(16), Nanos.from_millis(16))
     _loop = game_loop
     _timers(consume game_loop)
 
