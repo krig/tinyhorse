@@ -55,21 +55,21 @@ class Listener is TCPListenNotify
 class GameConnection is TCPConnectionNotify
   let _env: Env
   let _gameserver: GameServer tag
-  var _id: U32
+  var _client: U32
   var _buf: Reader
 
   new iso create(env: Env, gameserver: GameServer tag) =>
     _env = env
     _gameserver = gameserver
-    _id = 0
+    _client = 0
     _buf = Reader
 
   fun ref accepted(conn: TCPConnection ref) =>
     try
       let who = conn.remote_address().name()?
       _env.out.print("connection accepted from " + who._1 + ":" + who._2)
-      _id = (who._1 + ":" + who._2).hash().u32()
-      _gameserver.connect(_id, conn)
+      _client = (who._1 + ":" + who._2).hash().u32()
+      _gameserver.connect(_client, conn)
     else
       _env.out.print("Failed to get remote address for accepted connection")
       conn.close()
@@ -90,26 +90,25 @@ class GameConnection is TCPConnectionNotify
   fun ref _parse() ? =>
     let len = _buf.u16_be()?
     let typ = _buf.u16_be()?
-    if typ == 0 then // move
-      let x = _buf.i32_be()?
-      let y = _buf.i32_be()?
-      _gameserver.move(_id, x, y)
-    elseif typ == 1 then // say
-      let msg = _buf.block((len - 4).usize())?
-      _gameserver.say(_id, String.from_iso_array(consume msg))
-    elseif typ == 2 then // bye
-      _gameserver.bye(_id)
+    match typ
+    | Move.id() =>
+      (let x, let y) = Move.parse(_buf)?
+      _gameserver.move(_client, x, y)
+    | Say.id() =>
+      _gameserver.say(_client, Say.parse(_buf, (len - 4).usize())?)
+    | Bye.id() =>
+      _gameserver.bye(_client)
     end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso, times: USize): Bool =>
-    if _id == 0 then return true end
+    if _client == 0 then return true end
     _buf.append(consume data)
     _parse_loop()
     true
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print(_id.string() + " disconnected")
-    _gameserver.bye(_id)
+    _env.out.print(_client.string() + " disconnected")
+    _gameserver.bye(_client)
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     _env.out.print("connect failed")
@@ -157,58 +156,46 @@ class Player
     _conn.dispose()
 
 interface Event
-  fun id(): U32
+  fun client(): U32
   fun send(player: Player)
 
-class Move is Event
-  let _id: U32
+class MoveEvent is Event
+  let _client: U32
   let _x: I32
   let _y: I32
-  new create(id': U32, x': I32, y': I32) =>
-    _id = id'
+  new create(client': U32, x': I32, y': I32) =>
+    _client = client'
     _x = x'
     _y = y'
 
-  fun id(): U32 => _id
+  fun client(): U32 => _client
 
   fun send(player: Player) =>
-    player.writer()
-      .>u16_be(4 + 4 + 4 + 4)
-      .>u16_be(0)
-      .>u32_be(_id)
-      .>i32_be(_x)
-      .>i32_be(_y)
+    Move.to_client(player.writer(), _client, _x, _y)
     player.send()
 
-class Say is Event
-  let _id: U32
+class SayEvent is Event
+  let _client: U32
   let _msg: String val
-  new create(id': U32, msg': String val) =>
-    _id = id'
+  new create(client': U32, msg': String val) =>
+    _client = client'
     _msg = msg'
 
-  fun id(): U32 => _id
+  fun client(): U32 => _client
 
   fun send(player: Player) =>
-    player.writer()
-      .>u16_be(4 + 4 + _msg.size().u16())
-      .>u16_be(1)
-      .>u32_be(_id)
-      .>write(_msg)
+    Say.to_client(player.writer(), _client, _msg)
     player.send()
 
-class Bye is Event
-  let _id: U32
-  new create(id': U32) =>
-    _id = id'
+class ByeEvent is Event
+  let _client: U32
+  new create(client': U32) =>
+    _client = client'
 
-  fun id(): U32 => _id
+  fun client(): U32 => _client
 
   fun send(player: Player) =>
-    player.writer()
-      .>u16_be(4 + 4)
-      .>u16_be(2)
-      .>u32_be(_id)
+    Bye.to_client(player.writer(), _client)
     player.send()
 
 
@@ -238,42 +225,42 @@ actor GameServer is TimerNotify
     _loop = game_loop
     _timers(consume game_loop)
 
-  be connect(id: U32, conn: TCPConnection tag) =>
+  be connect(client: U32, conn: TCPConnection tag) =>
     try
-      _env.out.print("New player: " + id.string())
+      _env.out.print("New player: " + client.string())
       var new_player = Player(conn)
-      _players.insert(id, new_player)?
+      _players.insert(client, new_player)?
 
       for (pn, player) in _players.pairs() do
-        if id != pn then
-          Move(pn, player.x, player.y).send(new_player)
+        if client != pn then
+          MoveEvent(pn, player.x, player.y).send(new_player)
           if player.msgtimeout > 0 then
-            Say(pn, player.msg.clone()).send(new_player)
+            SayEvent(pn, player.msg.clone()).send(new_player)
           end
-          Move(id, new_player.x, new_player.y).send(player)
+          MoveEvent(client, new_player.x, new_player.y).send(player)
         end
       end
     else
-      _env.out.print("Failed to connect new player " + id.string())
+      _env.out.print("Failed to connect new player " + client.string())
     end
 
-  be move(id: U32, x: I32, y: I32) =>
+  be move(client: U32, x: I32, y: I32) =>
     try
-      _players(id)?.move(x, y)
-      _events.push(Move(id, x, y))
+      _players(client)?.move(x, y)
+      _events.push(MoveEvent(client, x, y))
     end
 
-  be say(id: U32, msg: String val) =>
+  be say(client: U32, msg: String val) =>
     try
-      _players(id)?.say(msg)
-      _events.push(Say(id, msg))
+      _players(client)?.say(msg)
+      _events.push(SayEvent(client, msg))
     end
 
-  be bye(id: U32) =>
-    Fmt("% is leaving")(id).print(_env.out)
+  be bye(client: U32) =>
+    Fmt("% is leaving")(client).print(_env.out)
     try
-      (_, let player) = _players.remove(id)?
-      _events.push(Bye(id))
+      (_, let player) = _players.remove(client)?
+      _events.push(ByeEvent(client))
       player.bye()
     end
 
@@ -286,8 +273,8 @@ actor GameServer is TimerNotify
       player.update()
     end
     for event in _events.values() do
-      for (id, player) in _players.pairs() do
-        if event.id() != id then
+      for (client, player) in _players.pairs() do
+        if event.client() != client then
           event.send(player)
         end
       end

@@ -217,15 +217,10 @@ actor Game
     end
 
   fun ref send_player_move() =>
-    send(_writer
-      .>u16_be(4 + 4 + 4)
-      .>u16_be(0)
-      .>i32_be(_player.x)
-      .>i32_be(_player.y)
-      .done())
+    send(Move.to_server(_writer, _player.x, _player.y).done())
 
   fun ref send_bye() =>
-    send(_writer.>u16_be(4).>u16_be(2).done())
+    send(Bye.to_server(_writer).done())
 
   be connected(conn: TCPConnection) =>
     _sendconn = conn
@@ -324,14 +319,13 @@ class NetNotify is TCPConnectionNotify
     let len = _buf.u16_be()?
     let typ = _buf.u16_be()?
     let id = _buf.u32_be()?
-    if typ == 0 then // move
-      let x = _buf.i32_be()?
-      let y = _buf.i32_be()?
+    match typ
+    | Move.id() =>
+      (let x, let y) = Move.parse(_buf)?
       _game.other_move(id, x, y)
-    elseif typ == 1 then // say
-      let msg = _buf.block((len - 4).usize())?
-      _game.other_say(id, String.from_iso_array(consume msg))
-    elseif typ == 2 then // bye
+    | Say.id() =>
+      _game.other_say(id, Say.parse(_buf, (len - 8).usize())?)
+    | Bye.id() =>
       _game.other_bye(id)
     end
 
