@@ -217,16 +217,15 @@ actor Game
     end
 
   fun ref send_player_move() =>
-    _writer.u16_be(4 + 4 + 4)
-    _writer.u16_be(0)
-    _writer.i32_be(_player.x)
-    _writer.i32_be(_player.y)
-    send(_writer.done())
+    send(_writer
+      .>u16_be(4 + 4 + 4)
+      .>u16_be(0)
+      .>i32_be(_player.x)
+      .>i32_be(_player.y)
+      .done())
 
   fun ref send_bye() =>
-    _writer.u16_be(4)
-    _writer.u16_be(2)
-    send(_writer.done())
+    send(_writer.>u16_be(4).>u16_be(2).done())
 
   be connected(conn: TCPConnection) =>
     _sendconn = conn
@@ -317,7 +316,6 @@ class NetNotify is TCPConnectionNotify
       try
         _parse()?
       else
-        _buf.clear()
         break
       end
     end
