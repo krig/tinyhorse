@@ -172,8 +172,12 @@ class Move is Event
   fun id(): U32 => _id
 
   fun send(player: Player) =>
-    let writer = player.writer()
-    writer.>u16_be(4 + 4 + 4 + 4).>u16_be(0).>u32_be(_id).>i32_be(_x).>i32_be(_y)
+    player.writer()
+      .>u16_be(4 + 4 + 4 + 4)
+      .>u16_be(0)
+      .>u32_be(_id)
+      .>i32_be(_x)
+      .>i32_be(_y)
     player.send()
 
 class Say is Event
@@ -186,8 +190,11 @@ class Say is Event
   fun id(): U32 => _id
 
   fun send(player: Player) =>
-    let writer = player.writer()
-    writer.>u16_be(4 + 4 + _msg.size().u16()).>u16_be(1).>u32_be(_id).>write(_msg)
+    player.writer()
+      .>u16_be(4 + 4 + _msg.size().u16())
+      .>u16_be(1)
+      .>u32_be(_id)
+      .>write(_msg)
     player.send()
 
 class Bye is Event
@@ -198,8 +205,10 @@ class Bye is Event
   fun id(): U32 => _id
 
   fun send(player: Player) =>
-    let writer = player.writer()
-    writer.>u16_be(4 + 4).>u16_be(2).>u32_be(_id)
+    player.writer()
+      .>u16_be(4 + 4)
+      .>u16_be(2)
+      .>u32_be(_id)
     player.send()
 
 
