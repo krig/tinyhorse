@@ -27,6 +27,8 @@ class Pony
     y = y'
     _controller = controller
 
+  fun brain(): PonyController tag => _controller
+
   fun draw(sdl: SDL2) =>
     let img = _controller.framebase() + _frame
     if dir < 0 then
@@ -243,7 +245,6 @@ actor Game
       try
         _otherponies.insert(id, other)?
         _ponies.push(Pony(x, y, other))
-        env.out.print("Creating avatar for " + id)
       end
     else
       try
@@ -255,7 +256,17 @@ actor Game
     None
 
   be other_bye(id: String val) =>
-    None
+    try
+      (_, let other) = _otherponies.remove(id)?
+      var i: USize = 0
+      while i < _ponies.size() do
+        if _ponies(i)?.brain() is other then
+          _ponies.delete(i)?
+        else
+          i = i + 1
+        end
+      end
+    end
 
 
 class NetNotify is TCPConnectionNotify
