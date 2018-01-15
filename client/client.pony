@@ -89,7 +89,7 @@ class PlayerPony is PonyController
   fun ref tick(pony: Pony) =>
     let dx: I32 = if left and not right then -1 elseif right and not left then 1 else 0 end
     let dy: I32 = if up and not down then -1 elseif down and not up then 1 else 0 end
-    pony.walk(dx * 2, dy * 2)
+    pony.walk(dx * 4, dy * 4)
     x = pony.x
     y = pony.y
     if (dx != 0) or (dy != 0) then
@@ -102,6 +102,7 @@ class OtherPony is PonyController
   let id: String val
   var x: I32
   var y: I32
+  var fresh: Bool = true
 
   new create(id': String val, x': I32, y': I32) =>
     id = id'
@@ -112,11 +113,14 @@ class OtherPony is PonyController
   fun ref tick(pony: Pony) =>
     let dx = x - pony.x
     let dy = y - pony.y
-    var mx: I32 = if dx > 0 then 1 elseif dx < 0 then -1 else 0 end
-    var my: I32 = if dy > 0 then 1 elseif dy < 0 then -1 else 0 end
-    if dx.abs() > 16 then mx = dx end
-    if dy.abs() > 16 then my = dy end
-    pony.walk(mx, my)
+    if fresh then
+      pony.walk(dx, dy)
+      fresh = false
+    else
+      var mx: I32 = if dx > 0 then ((dx/2) + 1) elseif dx < 0 then ((dx/2) + 1) else 0 end
+      var my: I32 = if dy > 0 then ((dy/2) + 1) elseif dy < 0 then ((dy/2) + 1) else 0 end
+      pony.walk(mx, my)
+    end
 
   fun ref move(x': I32, y': I32) =>
     x = x'
