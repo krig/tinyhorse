@@ -94,8 +94,6 @@ class GameConnection is TCPConnectionNotify
     | Move.id() =>
       (let x, let y) = Move.parse(_buf)?
       _gameserver.move(_client, x, y)
-    | Say.id() =>
-      _gameserver.say(_client, Say.parse(_buf, (len - 4).usize())?)
     | Bye.id() =>
       _gameserver.bye(_client)
     end
@@ -119,24 +117,12 @@ class Player
   let _writer: Writer
   var x: I32
   var y: I32
-  var msg: String ref
-  var msgtimeout: I32
 
   new create(conn: TCPConnection tag) =>
     _conn = conn
     _writer = Writer
     x = 0
     y = 0
-    msg = "".clone()
-    msgtimeout = 0
-
-  fun ref update() =>
-    if msgtimeout > 0 then
-      msgtimeout = msgtimeout - 1
-      if msgtimeout == 0 then
-        msg.clear()
-      end
-    end
 
   fun ref writer(): Writer => _writer
 
@@ -147,22 +133,21 @@ class Player
     x = x'
     y = y'
 
-  fun ref say(msg': String box) =>
-    msg.clear()
-    msg.insert_in_place(0, msg')
-    msgtimeout = 100
-
   fun ref bye() =>
     _conn.dispose()
 
+
 interface Event
   fun client(): U32
+
   fun send(player: Player)
+
 
 class MoveEvent is Event
   let _client: U32
   let _x: I32
   let _y: I32
+
   new create(client': U32, x': I32, y': I32) =>
     _client = client'
     _x = x'
@@ -174,21 +159,10 @@ class MoveEvent is Event
     Move.to_client(player.writer(), _client, _x, _y)
     player.send()
 
-class SayEvent is Event
-  let _client: U32
-  let _msg: String val
-  new create(client': U32, msg': String val) =>
-    _client = client'
-    _msg = msg'
-
-  fun client(): U32 => _client
-
-  fun send(player: Player) =>
-    Say.to_client(player.writer(), _client, _msg)
-    player.send()
 
 class ByeEvent is Event
   let _client: U32
+
   new create(client': U32) =>
     _client = client'
 
@@ -234,9 +208,6 @@ actor GameServer is TimerNotify
       for (pn, player) in _players.pairs() do
         if client != pn then
           MoveEvent(pn, player.x, player.y).send(new_player)
-          if player.msgtimeout > 0 then
-            SayEvent(pn, player.msg.clone()).send(new_player)
-          end
           MoveEvent(client, new_player.x, new_player.y).send(player)
         end
       end
@@ -248,12 +219,6 @@ actor GameServer is TimerNotify
     try
       _players(client)?.move(x, y)
       _events.push(MoveEvent(client, x, y))
-    end
-
-  be say(client: U32, msg: String val) =>
-    try
-      _players(client)?.say(msg)
-      _events.push(SayEvent(client, msg))
     end
 
   be bye(client: U32) =>
@@ -268,9 +233,6 @@ actor GameServer is TimerNotify
     if _nplayers != _players.size() then
       _env.out.print(_players.size().string() + " players")
       _nplayers = _players.size()
-    end
-    for player in _players.values() do
-      player.update()
     end
     for event in _events.values() do
       for (client, player) in _players.pairs() do

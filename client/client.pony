@@ -13,123 +13,22 @@ primitive SpriteW fun apply(): I32 => 96
 primitive SpriteH fun apply(): I32 => 64
 
 
-class Pony
-  var x: I32 = 0
-  var y: I32 = 0
-  // movement dir, 0 = standing still, 1 = right, -1 = left
-  var dir: I32 = 0
-  var moved: Bool = false
-  var _frame: I32 = 0
-  var _fcnt: I32 = 0
-  var _controller: PonyController
-
-  new create(x': I32, y': I32, controller: PonyController) =>
-    x = x'
-    y = y'
-    _controller = controller
-
-  fun brain(): PonyController tag => _controller
-
-  fun draw(sdl: SDL2) =>
-    let img = _controller.framebase() + _frame
-    if dir < 0 then
-      sdl.draw_texture(img, recover val SDLRect(x, y, SpriteW(), SpriteH()) end, SDLFlags.flip_horizontal())
+actor Main
+  new create(env:Env) =>
+    var server_ip: String val = ""
+    var server_port: String val = ""
+    try
+      if env.args.size() != 3 then error end
+      server_ip = env.args(1)?
+      server_port = env.args(2)?
     else
-      sdl.draw_texture(img, recover val SDLRect(x, y, SpriteW(), SpriteH()) end)
+      env.err.print("Usage: " + try env.args(0)? else "" end + " <server-ip> <server-port>")
+      env.exitcode(1)
+      return
     end
 
-  fun ref tick() =>
-    // only update animation when moving
-    if moved then
-      _fcnt = _fcnt + 1
-      if _fcnt > 1 then
-        _fcnt = 0
-        _frame = _frame + 1
-      end
-      if _frame > 1 then
-        _frame = 0
-      end
-    end
-    _controller.tick(this)
-    let fieldw = WinW() + SpriteW()
-    let fieldh = WinH() + SpriteH()
-    if x < -SpriteW() then
-      x = x + fieldw
-    elseif x > WinW() then
-      x = x - fieldw
-    end
-    if y < -SpriteH() then
-      y = y + fieldh
-    elseif y > WinH() then
-      y = y - fieldh
-    end
+    let game = Game(env, server_ip, server_port)
 
-  fun ref walk(x': I32, y': I32) =>
-    x = x + x'
-    y = y + y'
-    if x' < 0 then
-      dir = -1
-    elseif x' > 0 then
-      dir = 1
-    end
-    moved = (x' != 0) or (y' != 0)
-
-
-interface PonyController
-  fun ref tick(pony: Pony)
-  fun framebase(): I32
-
-
-class PlayerPony is PonyController
-  var left: Bool = false
-  var right: Bool = false
-  var up: Bool = false
-  var down: Bool = false
-  var x: I32 = 0
-  var y: I32 = 0
-  var moved: Bool = false
-
-  fun ref tick(pony: Pony) =>
-    let dx: I32 = if left and not right then -1 elseif right and not left then 1 else 0 end
-    let dy: I32 = if up and not down then -1 elseif down and not up then 1 else 0 end
-    pony.walk(dx * 4, dy * 4)
-    x = pony.x
-    y = pony.y
-    if (dx != 0) or (dy != 0) then
-      moved = true
-    end
-
-  fun framebase(): I32 => 0
-
-class OtherPony is PonyController
-  let id: U32
-  var x: I32
-  var y: I32
-  var fresh: Bool = true
-
-  new create(id': U32, x': I32, y': I32) =>
-    id = id'
-    x = x'
-    y = y'
-
-  // otherpony gets movement from network
-  fun ref tick(pony: Pony) =>
-    let dx = x - pony.x
-    let dy = y - pony.y
-    if fresh then
-      pony.walk(dx, dy)
-      fresh = false
-    else
-      var mx: I32 = if dx > 0 then ((dx/2) + 1) elseif dx < 0 then ((dx/2) + 1) else 0 end
-      var my: I32 = if dy > 0 then ((dy/2) + 1) elseif dy < 0 then ((dy/2) + 1) else 0 end
-      pony.walk(mx, my)
-    end
-
-  fun ref move(x': I32, y': I32) =>
-    x = x'
-    y = y'
-
-  fun framebase(): I32 => 2
 
 actor Game
   let env: Env
@@ -183,7 +82,6 @@ actor Game
     try
       _outconn = TCPConnection(env.root as AmbientAuth, NetNotify(env, this), server_ip, server_port)
     end
-
 
   be tick() =>
     let events: Array[SDLEvent] = sdl.poll_events()
@@ -261,9 +159,6 @@ actor Game
       end
     end
 
-  be other_say(id: U32, msg: String val) =>
-    None
-
   be other_bye(id: U32) =>
     try
       (_, let other) = _otherponies.remove(id)?
@@ -276,6 +171,126 @@ actor Game
         end
       end
     end
+
+
+class Pony
+  var x: I32 = 0
+  var y: I32 = 0
+  var dir: I32 = 0 // movement dir, 0 = standing still, 1 = right, -1 = left
+  var moved: Bool = false
+  var _frame: I32 = 0
+  var _fcnt: I32 = 0
+  var _controller: PonyController
+
+  new create(x': I32, y': I32, controller: PonyController) =>
+    x = x'
+    y = y'
+    _controller = controller
+
+  fun brain(): PonyController tag => _controller
+
+  fun draw(sdl: SDL2) =>
+    let img = _controller.framebase() + _frame
+    if dir < 0 then
+      sdl.draw_texture(img, recover val SDLRect(x, y, SpriteW(), SpriteH()) end, SDLFlags.flip_horizontal())
+    else
+      sdl.draw_texture(img, recover val SDLRect(x, y, SpriteW(), SpriteH()) end)
+    end
+
+  fun ref tick() =>
+    // only update animation when moving
+    if moved then
+      _fcnt = _fcnt + 1
+      if _fcnt > 1 then
+        _fcnt = 0
+        _frame = _frame + 1
+      end
+      if _frame > 1 then
+        _frame = 0
+      end
+    end
+    _controller.tick(this)
+    let fieldw = WinW() + SpriteW()
+    let fieldh = WinH() + SpriteH()
+    if x < -SpriteW() then
+      x = x + fieldw
+    elseif x > WinW() then
+      x = x - fieldw
+    end
+    if y < -SpriteH() then
+      y = y + fieldh
+    elseif y > WinH() then
+      y = y - fieldh
+    end
+
+  fun ref walk(x': I32, y': I32) =>
+    x = x + x'
+    y = y + y'
+    if x' < 0 then
+      dir = -1
+    elseif x' > 0 then
+      dir = 1
+    end
+    moved = (x' != 0) or (y' != 0)
+
+
+interface PonyController
+  fun ref tick(pony: Pony)
+
+  fun framebase(): I32
+
+
+class PlayerPony is PonyController
+  var left: Bool = false
+  var right: Bool = false
+  var up: Bool = false
+  var down: Bool = false
+  var x: I32 = 0
+  var y: I32 = 0
+  var moved: Bool = false
+
+  fun ref tick(pony: Pony) =>
+    let dx: I32 = if left and not right then -1 elseif right and not left then 1 else 0 end
+    let dy: I32 = if up and not down then -1 elseif down and not up then 1 else 0 end
+    pony.walk(dx * 4, dy * 4)
+    x = pony.x
+    y = pony.y
+    if (dx != 0) or (dy != 0) then
+      moved = true
+    end
+
+  fun framebase(): I32 => 0
+
+
+class OtherPony is PonyController
+  let id: U32
+  var x: I32
+  var y: I32
+  var fresh: Bool = true
+
+  new create(id': U32, x': I32, y': I32) =>
+    id = id'
+    x = x'
+    y = y'
+
+  // otherpony gets movement from network
+  fun ref tick(pony: Pony) =>
+    let dx = x - pony.x
+    let dy = y - pony.y
+    if fresh then
+      pony.walk(dx, dy)
+      fresh = false
+    else
+      var mx: I32 = if dx > 0 then ((dx/2) + 1) elseif dx < 0 then ((dx/2) + 1) else 0 end
+      var my: I32 = if dy > 0 then ((dy/2) + 1) elseif dy < 0 then ((dy/2) + 1) else 0 end
+      pony.walk(mx, my)
+    end
+
+  fun ref move(x': I32, y': I32) =>
+    x = x'
+    y = y'
+
+  fun framebase(): I32 => 2
 
 
 class NetNotify is TCPConnectionNotify
@@ -323,25 +338,6 @@ class NetNotify is TCPConnectionNotify
     | Move.id() =>
       (let x, let y) = Move.parse(_buf)?
       _game.other_move(id, x, y)
-    | Say.id() =>
-      _game.other_say(id, Say.parse(_buf, (len - 8).usize())?)
     | Bye.id() =>
       _game.other_bye(id)
     end
-
-
-actor Main
-  new create(env:Env) =>
-    var server_ip: String val = ""
-    var server_port: String val = ""
-    try
-      if env.args.size() != 3 then error end
-      server_ip = env.args(1)?
-      server_port = env.args(2)?
-    else
-      env.err.print("Usage: " + try env.args(0)? else "" end + " <server-ip> <server-port>")
-      env.exitcode(1)
-      return
-    end
-
-    let game = Game(env, server_ip, server_port)

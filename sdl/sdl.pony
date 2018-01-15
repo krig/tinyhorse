@@ -14,18 +14,9 @@ use @SDL_RenderFillRect[I32](renderer: Pointer[_SDLRenderer], rect: MaybePointer
 use @IMG_LoadTexture[Pointer[_SDLTexture]](renderer: Pointer[_SDLRenderer], file: Pointer[U8] tag)
 use @SDL_QueryTexture[I32](texture: Pointer[_SDLTexture], format: Pointer[U32], access: Pointer[I32], w: Pointer[I32], h: Pointer[I32])
 use @SDL_PollEvent[I32](event: MaybePointer[_SDLKeyboardEvent])
+use @SDL_RenderCopy[I32](renderer: Pointer[_SDLRenderer], texture: Pointer[_SDLTexture], srcrect: MaybePointer[_SDLRect val], dstrect: MaybePointer[_SDLRect val])
+use @SDL_RenderCopyEx[I32](renderer: Pointer[_SDLRenderer], texture: Pointer[_SDLTexture], srcrect: MaybePointer[_SDLRect val], dstrect: MaybePointer[_SDLRect val], angle: F64, center: MaybePointer[_SDLPoint val], flip: U32)
 
-use @SDL_RenderCopy[I32](renderer: Pointer[_SDLRenderer],
-  texture: Pointer[_SDLTexture],
-  srcrect: MaybePointer[_SDLRect val],
-  dstrect: MaybePointer[_SDLRect val])
-use @SDL_RenderCopyEx[I32](renderer: Pointer[_SDLRenderer],
-  texture: Pointer[_SDLTexture],
-  srcrect: MaybePointer[_SDLRect val],
-  dstrect: MaybePointer[_SDLRect val],
-  angle: F64,
-  center: MaybePointer[_SDLPoint val],
-  flip: U32)
 
 struct _SDLRect
   var x: I32 = 0
@@ -39,6 +30,7 @@ struct _SDLRect
     w = w1
     h = h1
 
+
 struct _SDLPoint
   var x: I32 = 0
   var y: I32 = 0
@@ -46,6 +38,7 @@ struct _SDLPoint
   new create(x1: I32, y1: I32) =>
     x = x1
     y = y1
+
 
 // Total 56 bytes
 struct _SDLKeyboardEvent
@@ -67,10 +60,12 @@ struct _SDLKeyboardEvent
   var pad3: U64 = 0
   var pad4: U16 = 0
 
+
 primitive _SDLEvents
   fun quit(): U32 => 0x100
   fun keydown(): U32 => 0x300
   fun keyup(): U32 => 0x301
+
 
 primitive SDLKeyCodes
   fun escape(): U32 => 27
@@ -79,6 +74,7 @@ primitive SDLKeyCodes
   fun right(): U32 => (1 << 30) + 79
   fun down(): U32 => (1 << 30) + 81
   fun up(): U32 => (1 << 30) + 82
+
 
 primitive _SDLWindow
 primitive _SDLRenderer
@@ -90,10 +86,12 @@ class SDLRect
   new create(x1: I32, y1: I32, w1: I32, h1: I32) =>
     rect = _SDLRect.create(x1, y1, w1, h1)
 
+
 class SDLTexture
   let texture: Pointer[_SDLTexture]
   new create(texture': Pointer[_SDLTexture]) =>
     texture = texture'
+
 
 primitive SDLFlags
   fun init_video(): U32 => 0x00000020
@@ -226,18 +224,21 @@ class SDLRenderer
     flip)
 
 
+type SDLEvent is (SDLQuit | SDLKeyUp | SDLKeyDown)
+
+
 class SDLQuit
   new iso create() =>
     None
+
 
 class SDLKeyUp
   let sym: U32
   new iso create(sym': U32) =>
     sym = sym'
 
+
 class SDLKeyDown
   let sym: U32
   new iso create(sym': U32) =>
     sym = sym'
-
-type SDLEvent is (SDLQuit | SDLKeyUp | SDLKeyDown)
