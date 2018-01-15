@@ -6,9 +6,21 @@ use "../gamecore"
 
 actor Main
   new create(env: Env) =>
+    var server_ip: String val = ""
+    var server_port: String val = ""
+    try
+      if env.args.size() != 3 then error end
+      server_ip = env.args(1)?
+      server_port = env.args(2)?
+    else
+      env.err.print("Usage: " + try env.args(0)? else "" end + " <server-ip> <server-port>")
+      env.exitcode(1)
+      return
+    end
+
     let gameserver = GameServer(env)
     try
-      TCPListener(env.root as AmbientAuth, Listener(env, gameserver), "", "8102")
+      TCPListener(env.root as AmbientAuth, Listener(env, gameserver), server_ip, server_port)
     else
       env.out.print("Unable to use the network :(")
     end
