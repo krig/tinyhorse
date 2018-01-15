@@ -1,3 +1,4 @@
+use "buffered"
 use "collections"
 use "net"
 use "time"
@@ -54,19 +55,20 @@ class Listener is TCPListenNotify
 class GameConnection is TCPConnectionNotify
   let _env: Env
   let _gameserver: GameServer tag
-  var _id: String
-  var _buf: String ref = String(128)
+  var _id: U32
+  var _buf: Reader
 
   new iso create(env: Env, gameserver: GameServer tag) =>
     _env = env
     _gameserver = gameserver
-    _id = ""
+    _id = 0
+    _buf = Reader
 
   fun ref accepted(conn: TCPConnection ref) =>
     try
       let who = conn.remote_address().name()?
       _env.out.print("connection accepted from " + who._1 + ":" + who._2)
-      _id = who._1 + ":" + who._2
+      _id = (who._1 + ":" + who._2).hash().u32()
       _gameserver.connect(_id, conn)
     else
       _env.out.print("Failed to get remote address for accepted connection")
@@ -74,39 +76,39 @@ class GameConnection is TCPConnectionNotify
     end
 
   fun ref _parse_loop() =>
-    while true do
-      let cmdend = try _buf.find("\n")? else break end
-      let cmd = _buf.substring(0, cmdend)
-      _buf.cut_in_place(0, cmdend + 1)
-      _parse(consume cmd)
+    while _buf.size() >= 4 do
+      let len: U16 = try _buf.peek_u16_be()? else 0 end
+      if (len == 0) or (_buf.size() < len.usize()) then break end
+      try
+        _parse()?
+      else
+        _buf.clear()
+        break
+      end
     end
 
-  fun ref _parse(cmd: String) =>
-    let input: Array[String val] = cmd.split(" ")
-    try
-      let command = input.shift()?
-      match command
-      | "move" =>
-        let x = input.shift()?.i32()?
-        let y = input.shift()?.i32()?
-        _gameserver.move(_id, x, y)
-      | "say" =>
-        _gameserver.say(_id, " ".join(input.values()))
-      | "bye" =>
-        _gameserver.bye(_id)
-      end
-    else
-      _env.out.print("parse error from " + _id + ": " + cmd)
+  fun ref _parse() ? =>
+    let len = _buf.u16_be()?
+    let typ = _buf.u16_be()?
+    if typ == 0 then // move
+      let x = _buf.i32_be()?
+      let y = _buf.i32_be()?
+      _gameserver.move(_id, x, y)
+    elseif typ == 1 then // say
+      let msg = _buf.block((len - 4).usize())?
+      _gameserver.say(_id, String.from_iso_array(consume msg))
+    elseif typ == 2 then // bye
+      _gameserver.bye(_id)
     end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso, times: USize): Bool =>
-    if _id == "" then return true end
+    if _id == 0 then return true end
     _buf.append(consume data)
     _parse_loop()
     true
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print(_id + " disconnected")
+    _env.out.print(_id.string() + " disconnected")
     _gameserver.bye(_id)
 
   fun ref connect_failed(conn: TCPConnection ref) =>
@@ -115,6 +117,7 @@ class GameConnection is TCPConnectionNotify
 
 class Player
   let _conn: TCPConnection tag
+  let _writer: Writer
   var x: I32
   var y: I32
   var msg: String ref
@@ -122,6 +125,7 @@ class Player
 
   new create(conn: TCPConnection tag) =>
     _conn = conn
+    _writer = Writer
     x = 0
     y = 0
     msg = "".clone()
@@ -135,8 +139,10 @@ class Player
       end
     end
 
-  fun send(cmd: String val) =>
-    _conn.write(cmd.array())
+  fun ref writer(): Writer => _writer
+
+  fun ref send() =>
+    _conn.writev(_writer.done())
 
   fun ref move(x': I32, y': I32) =>
     x = x'
@@ -151,44 +157,50 @@ class Player
     _conn.dispose()
 
 interface Event
-  fun name(): String val
+  fun id(): U32
   fun send(player: Player)
 
 class Move is Event
-  let _name: String val
+  let _id: U32
   let _x: I32
   let _y: I32
-  new create(name': String val, x': I32, y': I32) =>
-    _name = name'
+  new create(id': U32, x': I32, y': I32) =>
+    _id = id'
     _x = x'
     _y = y'
 
-  fun name(): String val => _name
+  fun id(): U32 => _id
 
   fun send(player: Player) =>
-    player.send(Fmt("move % % %\n")(_name)(_x)(_y).string())
+    let writer = player.writer()
+    writer.>u16_be(4 + 4 + 4 + 4).>u16_be(0).>u32_be(_id).>i32_be(_x).>i32_be(_y)
+    player.send()
 
 class Say is Event
-  let _name: String val
+  let _id: U32
   let _msg: String val
-  new create(name': String val, msg': String val) =>
-    _name = name'
+  new create(id': U32, msg': String val) =>
+    _id = id'
     _msg = msg'
 
-  fun name(): String val => _name
+  fun id(): U32 => _id
 
   fun send(player: Player) =>
-    player.send(Fmt("say % %\n")(_name)(_msg).string())
+    let writer = player.writer()
+    writer.>u16_be(4 + 4 + _msg.size().u16()).>u16_be(1).>u32_be(_id).>write(_msg)
+    player.send()
 
 class Bye is Event
-  let _name: String val
-  new create(name': String val) =>
-    _name = name'
+  let _id: U32
+  new create(id': U32) =>
+    _id = id'
 
-  fun name(): String val => _name
+  fun id(): U32 => _id
 
   fun send(player: Player) =>
-    player.send(Fmt("bye %\n")(_name).string())
+    let writer = player.writer()
+    writer.>u16_be(4 + 4).>u16_be(2).>u32_be(_id)
+    player.send()
 
 
 class Ticker is TimerNotify
@@ -204,7 +216,7 @@ class Ticker is TimerNotify
 
 actor GameServer is TimerNotify
   let _env: Env
-  let _players: Map[String val, Player] = Map[String val, Player]
+  let _players: Map[U32, Player] = Map[U32, Player]
   let _events: Array[Event] = []
   let _timers: Timers
   var _loop: (Timer tag | None tag) = None
@@ -217,42 +229,42 @@ actor GameServer is TimerNotify
     _loop = game_loop
     _timers(consume game_loop)
 
-  be connect(name: String val, conn: TCPConnection tag) =>
+  be connect(id: U32, conn: TCPConnection tag) =>
     try
-      _env.out.print("New player: " + name)
+      _env.out.print("New player: " + id.string())
       var new_player = Player(conn)
-      _players.insert(name, new_player)?
+      _players.insert(id, new_player)?
 
       for (pn, player) in _players.pairs() do
-        if name != pn then
+        if id != pn then
           Move(pn, player.x, player.y).send(new_player)
           if player.msgtimeout > 0 then
             Say(pn, player.msg.clone()).send(new_player)
           end
-          Move(name, new_player.x, new_player.y).send(player)
+          Move(id, new_player.x, new_player.y).send(player)
         end
       end
     else
-      _env.out.print("Failed to connect new player " + name)
+      _env.out.print("Failed to connect new player " + id.string())
     end
 
-  be move(name: String val, x: I32, y: I32) =>
+  be move(id: U32, x: I32, y: I32) =>
     try
-      _players(name)?.move(x, y)
-      _events.push(Move(name, x, y))
+      _players(id)?.move(x, y)
+      _events.push(Move(id, x, y))
     end
 
-  be say(name: String val, msg: String val) =>
+  be say(id: U32, msg: String val) =>
     try
-      _players(name)?.say(msg)
-      _events.push(Say(name, msg))
+      _players(id)?.say(msg)
+      _events.push(Say(id, msg))
     end
 
-  be bye(name: String val) =>
-    Fmt("% is leaving")(name).print(_env.out)
+  be bye(id: U32) =>
+    Fmt("% is leaving")(id).print(_env.out)
     try
-      (_, let player) = _players.remove(name)?
-      _events.push(Bye(name))
+      (_, let player) = _players.remove(id)?
+      _events.push(Bye(id))
       player.bye()
     end
 
@@ -265,8 +277,8 @@ actor GameServer is TimerNotify
       player.update()
     end
     for event in _events.values() do
-      for (name, player) in _players.pairs() do
-        if event.name() != name then
+      for (id, player) in _players.pairs() do
+        if event.id() != id then
           event.send(player)
         end
       end

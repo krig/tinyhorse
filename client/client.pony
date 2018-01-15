@@ -1,3 +1,4 @@
+use "buffered"
 use "collections"
 use "net"
 use "random"
@@ -101,12 +102,12 @@ class PlayerPony is PonyController
   fun framebase(): I32 => 0
 
 class OtherPony is PonyController
-  let id: String val
+  let id: U32
   var x: I32
   var y: I32
   var fresh: Bool = true
 
-  new create(id': String val, x': I32, y': I32) =>
+  new create(id': U32, x': I32, y': I32) =>
     id = id'
     x = x'
     y = y'
@@ -138,12 +139,14 @@ actor Game
   let tick_loop: Timer tag
   let _ponies: Array[Pony] = Array[Pony]
   let _player: PlayerPony
-  let _otherponies: Map[String val, OtherPony] = Map[String val, OtherPony]
+  let _otherponies: Map[U32, OtherPony] = Map[U32, OtherPony]
   var _outconn: (TCPConnection | None) = None
   var _sendconn: (TCPConnection | None) = None
+  var _writer: Writer
 
   new create(env': Env, server_ip: String val, server_port: String val) =>
     env = env'
+    _writer = Writer
     sdl = SDL2(SDLFlags.init_video(), "tiny horse", WinW(), WinH())
 
     sdl.load_texture("data/pony_00.png", 0)
@@ -162,7 +165,7 @@ actor Game
                           _game.render()
                           true
                         fun ref cancel(timer:Timer) => None
-                      end, 0, 16_666_667) // 30fps
+                      end, 0, 16_666_667)
     render_loop = rtimer
     timers(consume rtimer)
 
@@ -172,7 +175,7 @@ actor Game
                           _game.tick()
                           true
                         fun ref cancel(timer:Timer) => None
-                      end, 0, 66_666_667) // 15fps
+                      end, 0, 66_666_667)
     tick_loop = ttimer
     timers(consume ttimer)
 
@@ -195,7 +198,7 @@ actor Game
       pony.tick()
     end
     if _player.moved then
-      send_text(Fmt("move % %\n")(_player.x)(_player.y).string())
+      send_player_move()
       _player.moved = false
     end
 
@@ -208,14 +211,26 @@ actor Game
     end
     sdl.present()
 
-  fun ref send_text(text: String box) =>
+  fun ref send(data: Array[ByteSeq] iso) =>
     match _sendconn
-      | let conn: TCPConnection => conn.write(text.clone().array())
+      | let conn: TCPConnection => conn.writev(consume data)
     end
+
+  fun ref send_player_move() =>
+    _writer.u16_be(4 + 4 + 4)
+    _writer.u16_be(0)
+    _writer.i32_be(_player.x)
+    _writer.i32_be(_player.y)
+    send(_writer.done())
+
+  fun ref send_bye() =>
+    _writer.u16_be(4)
+    _writer.u16_be(2)
+    send(_writer.done())
 
   be connected(conn: TCPConnection) =>
     _sendconn = conn
-    send_text(Fmt("move % %\n")(_player.x)(_player.y).string())
+    send_player_move()
 
   fun ref keydown(event: SDLKeyDown) =>
     if event.sym == SDLKeyCodes.left() then _player.left = true end
@@ -231,7 +246,7 @@ actor Game
     if event.sym == SDLKeyCodes.down() then _player.down = false end
 
   be dispose() =>
-    send_text("bye\n")
+    send_bye()
     timers.cancel(render_loop)
     timers.cancel(tick_loop)
     sdl.dispose()
@@ -239,7 +254,7 @@ actor Game
       | let conn: TCPConnection => conn.dispose()
     end
 
-  be other_move(id: String val, x: I32, y: I32) =>
+  be other_move(id: U32, x: I32, y: I32) =>
     if not _otherponies.contains(id) then
       let other = OtherPony(id, x, y)
       try
@@ -252,10 +267,10 @@ actor Game
       end
     end
 
-  be other_say(id: String val, msg: String val) =>
+  be other_say(id: U32, msg: String val) =>
     None
 
-  be other_bye(id: String val) =>
+  be other_bye(id: U32) =>
     try
       (_, let other) = _otherponies.remove(id)?
       var i: USize = 0
@@ -272,11 +287,12 @@ actor Game
 class NetNotify is TCPConnectionNotify
   let _env: Env
   let _game: Game
-  var _buf: String ref = String(128)
+  var _buf: Reader
 
   new iso create(env: Env, game: Game) =>
     _env = env
     _game = game
+    _buf = Reader
 
   fun ref connected(conn: TCPConnection ref) =>
     try
@@ -295,30 +311,30 @@ class NetNotify is TCPConnectionNotify
     true
 
   fun ref _parse_loop() =>
-    while true do
-      let cmdend = try _buf.find("\n")? else break end
-      let cmd = _buf.substring(0, cmdend)
-      _buf.cut_in_place(0, cmdend + 1)
-      _parse(consume cmd)
+    while _buf.size() >= 4 do
+      let len: U16 = try _buf.peek_u16_be()? else 0 end
+      if (len == 0) or (_buf.size() < len.usize()) then break end
+      try
+        _parse()?
+      else
+        _buf.clear()
+        break
+      end
     end
 
-  fun ref _parse(cmd: String) =>
-    let input: Array[String val] = cmd.split(" ")
-    try
-      let command = input.shift()?
-      let id = input.shift()?
-      match command
-      | "move" =>
-        let x = input.shift()?.i32()?
-        let y = input.shift()?.i32()?
-        _game.other_move(id, x, y)
-      | "say" =>
-        _game.other_say(id, " ".join(input.values()))
-      | "bye" =>
-        _game.other_bye(id)
-      end
-    else
-      _env.out.print("parse error from server: " + cmd)
+  fun ref _parse() ? =>
+    let len = _buf.u16_be()?
+    let typ = _buf.u16_be()?
+    let id = _buf.u32_be()?
+    if typ == 0 then // move
+      let x = _buf.i32_be()?
+      let y = _buf.i32_be()?
+      _game.other_move(id, x, y)
+    elseif typ == 1 then // say
+      let msg = _buf.block((len - 4).usize())?
+      _game.other_say(id, String.from_iso_array(consume msg))
+    elseif typ == 2 then // bye
+      _game.other_bye(id)
     end
 
 
