@@ -58,22 +58,20 @@ actor Game
     let ry = (mt.next() % (WinH() - (SpriteH() * 2)).u64()).abs().i32() + SpriteH()
     _ponies.push(Pony(rx, ry, _player))
 
-    let rtimer = Timer(object iso
+    let rtimer = Timer(object iso is TimerNotify
                         let _game:Game = this
                         fun ref apply(timer:Timer, count:U64):Bool =>
                           _game.render()
                           true
-                        fun ref cancel(timer:Timer) => None
                       end, 0, 16_666_667)
     render_loop = rtimer
     timers(consume rtimer)
 
-    let ttimer = Timer(object iso
+    let ttimer = Timer(object iso is TimerNotify
                         let _game:Game = this
                         fun ref apply(timer:Timer, count:U64):Bool =>
                           _game.tick()
                           true
-                        fun ref cancel(timer:Timer) => None
                       end, 0, 66_666_667)
     tick_loop = ttimer
     timers(consume ttimer)

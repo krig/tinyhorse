@@ -174,18 +174,7 @@ class ByeEvent is Event
     player.send()
 
 
-class Ticker is TimerNotify
-  let _server: GameServer tag
-
-  new iso create(server: GameServer tag) =>
-    _server = server
-
-  fun apply(timer: Timer, count: U64): Bool =>
-    _server.tick()
-    true
-
-
-actor GameServer is TimerNotify
+actor GameServer
   let _env: Env
   let _players: Map[U32, Player] = Map[U32, Player]
   let _timers: Timers
@@ -195,7 +184,12 @@ actor GameServer is TimerNotify
   new create(env: Env) =>
     _env = env
     _timers = Timers
-    let game_loop = Timer(Ticker(this), Nanos.from_millis(50), Nanos.from_millis(50))
+    let game_loop = Timer(object iso is TimerNotify
+                            let _server: GameServer = this
+                            fun ref apply(timer: Timer, count: U64): Bool =>
+                              _server.tick()
+                              true
+                          end, Nanos.from_millis(50), Nanos.from_millis(50))
     _loop = game_loop
     _timers(consume game_loop)
 
@@ -226,9 +220,9 @@ actor GameServer is TimerNotify
     end
 
   be bye(client: U32) =>
-    Fmt("% is leaving")(client).print(_env.out)
     try
       (_, let rmplayer) = _players.remove(client)?
+      Fmt("% is leaving")(client).print(_env.out)
       rmplayer.bye()
       for (pn, player) in _players.pairs() do
         if client != pn then
