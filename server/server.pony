@@ -23,7 +23,8 @@ actor Main
     try
       TCPListener(env.root as AmbientAuth, Listener(env, gameserver), server_ip, server_port)
     else
-      env.out.print("Unable to use the network :(")
+      env.err.print("Unable to use the network :(")
+      env.exitcode(1)
     end
 
 
@@ -187,7 +188,6 @@ class Ticker is TimerNotify
 actor GameServer is TimerNotify
   let _env: Env
   let _players: Map[U32, Player] = Map[U32, Player]
-  let _events: Array[Event] = []
   let _timers: Timers
   var _loop: (Timer tag | None tag) = None
   var _nplayers: USize = 0
@@ -195,7 +195,7 @@ actor GameServer is TimerNotify
   new create(env: Env) =>
     _env = env
     _timers = Timers
-    let game_loop = Timer(Ticker(this), Nanos.from_millis(16), Nanos.from_millis(16))
+    let game_loop = Timer(Ticker(this), Nanos.from_millis(50), Nanos.from_millis(50))
     _loop = game_loop
     _timers(consume game_loop)
 
@@ -218,15 +218,23 @@ actor GameServer is TimerNotify
   be move(client: U32, x: I32, y: I32) =>
     try
       _players(client)?.move(x, y)
-      _events.push(MoveEvent(client, x, y))
+      for (pn, player) in _players.pairs() do
+        if client != pn then
+          MoveEvent(client, x, y).send(player)
+        end
+      end
     end
 
   be bye(client: U32) =>
     Fmt("% is leaving")(client).print(_env.out)
     try
-      (_, let player) = _players.remove(client)?
-      _events.push(ByeEvent(client))
-      player.bye()
+      (_, let rmplayer) = _players.remove(client)?
+      rmplayer.bye()
+      for (pn, player) in _players.pairs() do
+        if client != pn then
+          ByeEvent(client).send(player)
+        end
+      end
     end
 
   be tick() =>
@@ -234,11 +242,3 @@ actor GameServer is TimerNotify
       _env.out.print(_players.size().string() + " players")
       _nplayers = _players.size()
     end
-    for event in _events.values() do
-      for (client, player) in _players.pairs() do
-        if event.client() != client then
-          event.send(player)
-        end
-      end
-    end
-    _events.clear()
