@@ -38,7 +38,7 @@ actor Game
   let tick_loop: Timer tag
   let _ponies: Array[Pony] = Array[Pony]
   let _player: PlayerPony
-  let _otherponies: Map[U32, OtherPony] = Map[U32, OtherPony]
+  let _otherponies: Map[U32, NetPony] = Map[U32, NetPony]
   var _outconn: (TCPConnection | None) = None
   var _sendconn: (TCPConnection | None) = None
   var _writer: Writer
@@ -123,17 +123,21 @@ actor Game
     send_player_move()
 
   fun ref keydown(event: SDLKeyDown) =>
-    if event.sym == SDLKeyCodes.left() then _player.left = true end
-    if event.sym == SDLKeyCodes.right() then _player.right = true end
-    if event.sym == SDLKeyCodes.up() then _player.up = true end
-    if event.sym == SDLKeyCodes.down() then _player.down = true end
+    match event.sym
+      | SDLKeyCodes.left() => _player.left = true
+      | SDLKeyCodes.right() => _player.right = true
+      | SDLKeyCodes.up() => _player.up = true
+      | SDLKeyCodes.down() => _player.down = true
+    end
 
   fun ref keyup(event: SDLKeyUp) =>
-    if event.sym == SDLKeyCodes.escape() then dispose() end
-    if event.sym == SDLKeyCodes.left() then _player.left = false end
-    if event.sym == SDLKeyCodes.right() then _player.right = false end
-    if event.sym == SDLKeyCodes.up() then _player.up = false end
-    if event.sym == SDLKeyCodes.down() then _player.down = false end
+    match event.sym
+      | SDLKeyCodes.escape() => dispose()
+      | SDLKeyCodes.left() => _player.left = false
+      | SDLKeyCodes.right() => _player.right = false
+      | SDLKeyCodes.up() => _player.up = false
+      | SDLKeyCodes.down() => _player.down = false
+    end
 
   be dispose() =>
     send_bye()
@@ -146,7 +150,7 @@ actor Game
 
   be other_move(id: U32, x: I32, y: I32) =>
     if not _otherponies.contains(id) then
-      let other = OtherPony(id, x, y)
+      let other = NetPony(id, x, y)
       try
         _otherponies.insert(id, other)?
         _ponies.push(Pony(x, y, other))
@@ -260,7 +264,7 @@ class PlayerPony is PonyController
   fun framebase(): I32 => 0
 
 
-class OtherPony is PonyController
+class NetPony is PonyController
   let id: U32
   var x: I32
   var y: I32
@@ -271,7 +275,6 @@ class OtherPony is PonyController
     x = x'
     y = y'
 
-  // otherpony gets movement from network
   fun ref tick(pony: Pony) =>
     let dx = x - pony.x
     let dy = y - pony.y
@@ -321,11 +324,7 @@ class NetNotify is TCPConnectionNotify
     while _buf.size() >= 4 do
       let len: U16 = try _buf.peek_u16_be()? else 0 end
       if (len == 0) or (_buf.size() < len.usize()) then break end
-      try
-        _parse()?
-      else
-        break
-      end
+      try _parse()? else _buf.clear() end
     end
 
   fun ref _parse() ? =>
@@ -338,4 +337,6 @@ class NetNotify is TCPConnectionNotify
       _game.other_move(id, x, y)
     | Bye.id() =>
       _game.other_bye(id)
+    else
+      error
     end
