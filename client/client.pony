@@ -271,7 +271,7 @@ class NetPony is PonyController
     if fresh then
       pony.walk(dx, dy)
       fresh = false
-    else
+    else // movement easing
       var mx: I32 = if dx > 0 then ((dx/2) + 1) elseif dx < 0 then ((dx/2) + 1) else 0 end
       var my: I32 = if dy > 0 then ((dy/2) + 1) elseif dy < 0 then ((dy/2) + 1) else 0 end
       pony.walk(mx, my)
@@ -284,7 +284,7 @@ class NetPony is PonyController
   fun framebase(): I32 => 2
 
 
-class NetNotify is TCPConnectionNotify
+class NetNotify is (TCPConnectionNotify & EventHandler)
   let _env: Env
   let _game: Game
   var _buf: Reader
@@ -297,7 +297,7 @@ class NetNotify is TCPConnectionNotify
   fun ref connected(conn: TCPConnection ref) =>
     try
       let who = conn.remote_address().name()?
-      _env.out.print("Connected to " + who._1 + ":" + who._2)
+      Sform("Connected to %:%")(who._1)(who._2).print(_env.out)
     end
     conn.set_keepalive(30)
     _game.connected(conn)
@@ -307,8 +307,11 @@ class NetNotify is TCPConnectionNotify
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso, times: USize): Bool =>
     _buf.append(consume data)
-    Events.read(_buf, object is EventHandler
-      fun moved(client: U32, x: I32, y: I32) => _game.other_move(client, x, y)
-      fun bye(client: U32) => _game.other_bye(client)
-    end)
+    Events.read(_buf, this)
     true
+
+  fun moved(client: U32, x: I32, y: I32) =>
+    _game.other_move(client, x, y)
+
+  fun bye(client: U32) =>
+    _game.other_bye(client)

@@ -26,7 +26,7 @@ actor Main
           listen.close()
 
         fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-          GameConnection(env, gameserver)
+          ClientConnection(env, gameserver)
       end
     end
     try
@@ -37,7 +37,7 @@ actor Main
     end
 
 
-class GameConnection is TCPConnectionNotify
+class ClientConnection is (TCPConnectionNotify & EventHandler)
   let _env: Env
   let _gameserver: GameServer tag
   var _client: U32
@@ -64,11 +64,14 @@ class GameConnection is TCPConnectionNotify
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso, times: USize): Bool =>
     if _client == 0 then return true end
     _buf.append(consume data)
-    Events.read(_buf, object is EventHandler
-      fun move(x: I32, y: I32) => _gameserver.move(_client, x, y)
-      fun quit() => _gameserver.bye(_client)
-    end)
+    Events.read(_buf, this)
     true
+
+  fun move(x: I32, y: I32) =>
+    _gameserver.move(_client, x, y)
+
+  fun quit() =>
+    _gameserver.bye(_client)
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print(_client.string() + " disconnected")
