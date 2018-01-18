@@ -80,15 +80,12 @@ class GameConnection is TCPConnectionNotify
 
 class Player
   let _conn: TCPConnection tag
-  let writer: Writer = Writer
+  let _writer: Writer = Writer
   var x: I32 = 0
   var y: I32 = 0
 
   new create(conn: TCPConnection tag) =>
     _conn = conn
-
-  fun ref send() =>
-    _conn.writev(writer.done())
 
   fun ref move(x': I32, y': I32) =>
     x = x'
@@ -97,25 +94,22 @@ class Player
   fun ref bye() =>
     _conn.dispose()
 
+  fun ref send_move(from: U32, x': I32, y': I32) =>
+    Moved.write(_writer, from, x', y')
+    _conn.writev(_writer.done())
+
+  fun ref send_bye(from: U32) =>
+    Bye.write(_writer, from)
+    _conn.writev(_writer.done())
+
+
 
 actor GameServer
   let _env: Env
   let _players: Map[U32, Player] = Map[U32, Player]
-  let _timers: Timers
-  var _loop: (Timer tag | None tag) = None
-  var _nplayers: USize = 0
 
   new create(env: Env) =>
     _env = env
-    _timers = Timers
-    let game_loop = Timer(object iso is TimerNotify
-                            let _server: GameServer = this
-                            fun ref apply(timer: Timer, count: U64): Bool =>
-                              _server.tick()
-                              true
-                          end, Nanos.from_millis(50), Nanos.from_millis(50))
-    _loop = game_loop
-    _timers(consume game_loop)
 
   be connect(client: U32, conn: TCPConnection tag) =>
     try
@@ -125,8 +119,8 @@ actor GameServer
 
       for (pn, player) in _players.pairs() do
         if client != pn then
-          send_move(new_player, pn, player.x, player.y)
-          send_move(player, client, new_player.x, new_player.y)
+          new_player.send_move(pn, player.x, player.y)
+          player.send_move(client, new_player.x, new_player.y)
         end
       end
     else
@@ -138,7 +132,7 @@ actor GameServer
       _players(client)?.move(x, y)
       for (pn, player) in _players.pairs() do
         if client != pn then
-          send_move(player, client, x, y)
+          player.send_move(client, x, y)
         end
       end
     end
@@ -150,21 +144,7 @@ actor GameServer
       rmplayer.bye()
       for (pn, player) in _players.pairs() do
         if client != pn then
-          send_bye(player, client)
+          player.send_bye(client)
         end
       end
     end
-
-  be tick() =>
-    if _nplayers != _players.size() then
-      _env.out.print(_players.size().string() + " players")
-      _nplayers = _players.size()
-    end
-
-  fun send_move(to: Player, from: U32, x: I32, y: I32) =>
-    Moved.write(to.writer, from, x, y)
-    to.send()
-
-  fun send_bye(to: Player, from: U32) =>
-    Bye.write(to.writer, from)
-    to.send()
