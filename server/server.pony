@@ -20,37 +20,31 @@ actor Main
     end
 
     let gameserver = GameServer(env)
+    let notify = recover iso
+      object is TCPListenNotify
+        fun ref listening(listen: TCPListener ref) =>
+          try
+            let me = listen.local_address().name()?
+            Sform("Listening on %:%")(me._1)(me._2).print(env.out)
+          else
+            env.err.print("Couldn't get local address")
+            listen.close()
+          end
+
+        fun ref not_listening(listen: TCPListener ref) =>
+          Sform("Couldn't listen to %:%")(server_ip)(server_port).print(env.err)
+          listen.close()
+
+        fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
+          GameConnection(env, gameserver)
+      end
+    end
     try
-      TCPListener(env.root as AmbientAuth, Listener(env, gameserver), server_ip, server_port)
+      TCPListener(env.root as AmbientAuth, consume notify, server_ip, server_port)
     else
       env.err.print("Unable to use the network :(")
       env.exitcode(1)
     end
-
-
-class Listener is TCPListenNotify
-  let _env: Env
-  let _gameserver: GameServer tag
-
-  new iso create(env: Env, gameserver: GameServer tag) =>
-    _env = env
-    _gameserver = gameserver
-
-  fun ref listening(listen: TCPListener ref) =>
-    try
-      let me = listen.local_address().name()?
-      _env.out.print("Listening on " + me._1 + ":" + me._2)
-    else
-      _env.err.print("Couldn't get local address")
-      listen.close()
-    end
-
-  fun ref not_listening(listen: TCPListener ref) =>
-    _env.err.print("Couldn't listen")
-    listen.close()
-
-  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    GameConnection(_env, _gameserver)
 
 
 class GameConnection is TCPConnectionNotify
@@ -178,7 +172,7 @@ actor GameServer
   be bye(client: U32) =>
     try
       (_, let rmplayer) = _players.remove(client)?
-      Fmt("% is leaving")(client).print(_env.out)
+      Sform("% is leaving")(client).print(_env.out)
       rmplayer.bye()
       for (pn, player) in _players.pairs() do
         if client != pn then

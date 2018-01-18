@@ -1,17 +1,17 @@
 use "itertools"
 
-class Fmt
+class Sform
   let _fmt: String box
   var _args: Array[String val] = []
 
   new create(fmt: String box) =>
     _fmt = fmt
 
-  fun ref apply(arg: Stringable box): Fmt =>
+  fun ref apply(arg: Stringable box): Sform =>
     _args.push(arg.string())
     this
 
-  fun ref a[A: Stringable #read](arg: A): Fmt =>
+  fun ref a[A: Stringable #read](arg: A): Sform =>
     _args.push(arg.string())
     this
 
