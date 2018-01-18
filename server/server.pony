@@ -7,18 +7,8 @@ use "../gamecore"
 
 actor Main
   new create(env: Env) =>
-    var server_ip: String val = ""
-    var server_port: String val = ""
-    try
-      if env.args.size() != 3 then error end
-      server_ip = env.args(1)?
-      server_port = env.args(2)?
-    else
-      env.err.print("Usage: " + try env.args(0)? else "" end + " <server-ip> <server-port>")
-      env.exitcode(1)
-      return
-    end
-
+    let server_ip = try env.args(1)? else "::1" end
+    let server_port = try env.args(2)? else "6000" end
     let gameserver = GameServer(env)
     let notify = recover iso
       object is TCPListenNotify

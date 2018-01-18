@@ -15,19 +15,9 @@ primitive SpriteH fun apply(): I32 => 64
 
 actor Main
   new create(env:Env) =>
-    var server_ip: String val = ""
-    var server_port: String val = ""
-    try
-      if env.args.size() != 3 then error end
-      server_ip = env.args(1)?
-      server_port = env.args(2)?
-    else
-      env.err.print("Usage: " + try env.args(0)? else "" end + " <server-ip> <server-port>")
-      env.exitcode(1)
-      return
-    end
-
-    let game = Game(env, server_ip, server_port)
+    let server_ip = try env.args(1)? else "::1" end
+    let server_port = try env.args(2)? else "6000" end
+    Game(env, server_ip, server_port)
 
 
 actor Game
@@ -39,8 +29,7 @@ actor Game
   let _ponies: Array[Pony] = Array[Pony]
   let _player: PlayerPony
   let _otherponies: Map[U32, NetPony] = Map[U32, NetPony]
-  var _outconn: (TCPConnection | None) = None
-  var _sendconn: (TCPConnection | None) = None
+  var _conn: (TCPConnection | None) = None
   var _writer: Writer
 
   new create(env': Env, server_ip: String val, server_port: String val) =>
@@ -59,7 +48,7 @@ actor Game
     _ponies.push(Pony(rx, ry, _player))
 
     let rtimer = Timer(object iso is TimerNotify
-                        let _game:Game = this
+                        let _game: Game = this
                         fun ref apply(timer:Timer, count:U64):Bool =>
                           _game.render()
                           true
@@ -68,7 +57,7 @@ actor Game
     timers(consume rtimer)
 
     let ttimer = Timer(object iso is TimerNotify
-                        let _game:Game = this
+                        let _game: Game = this
                         fun ref apply(timer:Timer, count:U64):Bool =>
                           _game.tick()
                           true
@@ -78,7 +67,7 @@ actor Game
 
     // setup network
     try
-      _outconn = TCPConnection(env.root as AmbientAuth, NetNotify(env, this), server_ip, server_port)
+      _conn = TCPConnection(env.root as AmbientAuth, NetNotify(env, this), server_ip, server_port)
     end
 
   be tick() =>
@@ -108,7 +97,7 @@ actor Game
     sdl.present()
 
   fun ref send(data: Array[ByteSeq] iso) =>
-    match _sendconn
+    match _conn
       | let conn: TCPConnection => conn.writev(consume data)
     end
 
@@ -121,7 +110,6 @@ actor Game
     send(_writer.done())
 
   be connected(conn: TCPConnection) =>
-    _sendconn = conn
     send_player_move()
 
   fun ref keydown(event: SDLKeyDown) =>
@@ -146,7 +134,7 @@ actor Game
     timers.cancel(render_loop)
     timers.cancel(tick_loop)
     sdl.dispose()
-    match _outconn
+    match _conn
       | let conn: TCPConnection => conn.dispose()
     end
 
