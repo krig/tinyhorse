@@ -113,10 +113,12 @@ actor Game
     end
 
   fun ref send_player_move() =>
-    send(Move.to_server(_writer, _player.x, _player.y).done())
+    Move.write(_writer, _player.x, _player.y)
+    send(_writer.done())
 
   fun ref send_bye() =>
-    send(Bye.to_server(_writer).done())
+    Quit.write(_writer)
+    send(_writer.done())
 
   be connected(conn: TCPConnection) =>
     _sendconn = conn
@@ -317,26 +319,8 @@ class NetNotify is TCPConnectionNotify
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso, times: USize): Bool =>
     _buf.append(consume data)
-    _parse_loop()
+    Events.read(_buf, object is EventHandler
+      fun moved(client: U32, x: I32, y: I32) => _game.other_move(client, x, y)
+      fun bye(client: U32) => _game.other_bye(client)
+    end)
     true
-
-  fun ref _parse_loop() =>
-    while _buf.size() >= 4 do
-      let len: U16 = try _buf.peek_u16_be()? else 0 end
-      if (len == 0) or (_buf.size() < len.usize()) then break end
-      try _parse()? else _buf.clear() end
-    end
-
-  fun ref _parse() ? =>
-    let len = _buf.u16_be()?
-    let typ = _buf.u16_be()?
-    let id = _buf.u32_be()?
-    match typ
-    | Move.id() =>
-      (let x, let y) = Move.parse(_buf)?
-      _game.other_move(id, x, y)
-    | Bye.id() =>
-      _game.other_bye(id)
-    else
-      error
-    end

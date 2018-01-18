@@ -62,38 +62,22 @@ class GameConnection is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     try
       let who = conn.remote_address().name()?
-      _env.out.print("connection accepted from " + who._1 + ":" + who._2)
-      _client = (who._1 + ":" + who._2).hash().u32()
+      let name = Sform("%:%")(who._1)(who._2).string()
+      _env.out.print("Connection accepted from " + name)
+      _client = name.hash().u32()
       _gameserver.connect(_client, conn)
     else
       _env.out.print("Failed to get remote address for accepted connection")
       conn.close()
     end
 
-  fun ref _parse_loop() =>
-    while _buf.size() >= 4 do
-      let len: U16 = try _buf.peek_u16_be()? else 0 end
-      if (len == 0) or (_buf.size() < len.usize()) then break end
-      try _parse()? else _buf.clear() end
-    end
-
-  fun ref _parse() ? =>
-    let len = _buf.u16_be()?
-    let typ = _buf.u16_be()?
-    match typ
-    | Move.id() =>
-      (let x, let y) = Move.parse(_buf)?
-      _gameserver.move(_client, x, y)
-    | Bye.id() =>
-      _gameserver.bye(_client)
-    else
-      error
-    end
-
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso, times: USize): Bool =>
     if _client == 0 then return true end
     _buf.append(consume data)
-    _parse_loop()
+    Events.read(_buf, object is EventHandler
+      fun move(x: I32, y: I32) => _gameserver.move(_client, x, y)
+      fun quit() => _gameserver.bye(_client)
+    end)
     true
 
   fun ref closed(conn: TCPConnection ref) =>
@@ -188,9 +172,9 @@ actor GameServer
     end
 
   fun send_move(to: Player, from: U32, x: I32, y: I32) =>
-    Move.to_client(to.writer, from, x, y)
+    Moved.write(to.writer, from, x, y)
     to.send()
 
   fun send_bye(to: Player, from: U32) =>
-    Bye.to_client(to.writer, from)
+    Bye.write(to.writer, from)
     to.send()
