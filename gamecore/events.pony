@@ -9,7 +9,7 @@ interface EventHandler
   fun bye(client: U32) => None
   fun object_add(oid: U16, otype: U16, x: I32, y: I32) => None
   fun object_del(oid: U16) => None
-  fun object_count(client: U32, oid: U16, count: U16) => None
+  fun object_count(client: U32, otype: U16, count: U16) => None
 
 
 primitive Events
@@ -110,12 +110,12 @@ primitive ObjectCount
 
   fun parse(reader: Reader, len: U16, handler: EventHandler) ? =>
     let client = reader.u32_le()?
-    let oid = reader.u16_le()?
+    let otype = reader.u16_le()?
     let count = reader.u16_le()?
-    handler.object_count(client, oid, count)
+    handler.object_count(client, otype, count)
 
-  fun write(writer: Writer, client: U32, oid: U16, count: U16) =>
-    writer.>u16_le(8).>u16_le(id()).>u32_le(client).>u16_le(oid).>u16_le(count)
+  fun write(writer: Writer, client: U32, otype: U16, count: U16) =>
+    writer.>u16_le(8).>u16_le(id()).>u32_le(client).>u16_le(otype).>u16_le(count)
 
 
 primitive Welcome

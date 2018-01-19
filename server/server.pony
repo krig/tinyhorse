@@ -6,9 +6,6 @@ use "time"
 use "../gamecore"
 
 
-primitive _Apple fun apply(): U16 => 0
-
-
 actor Main
   new create(env: Env) =>
     let server_ip = try env.args(1)? else "::1" end
@@ -143,8 +140,8 @@ class Player
     ObjectDel.write(_writer, oid)
     _conn.writev(_writer.done())
 
-  fun ref send_object_count(of: U32, oid: U16, count: U16) =>
-    ObjectCount.write(_writer, of, oid, count)
+  fun ref send_object_count(of: U32, otype: U16, count: U16) =>
+    ObjectCount.write(_writer, of, otype, count)
     _conn.writev(_writer.done())
 
 
@@ -182,7 +179,7 @@ actor GameServer
   be spawn() =>
     if _objects.size() < MaxObjs() then
       let pos = SpawnPos(_mt)
-      let typ = _Apple()
+      let typ = Apple()
       let gobj = GameObject(typ, pos._1, pos._2)
       _objects(_next_goid) = gobj
       Sform("Spawning at %, %!")(pos._1)(pos._2).print(_env.out)
@@ -210,8 +207,8 @@ actor GameServer
 
       for (pn, player) in _players.pairs() do
         new_player.send_move(pn, player.x, player.y)
-        for (oid, ocount) in player.objects.pairs() do
-          player.send_object_count(pn, oid, ocount)
+        for (otype, ocount) in player.objects.pairs() do
+          new_player.send_object_count(pn, otype, ocount)
         end
         player.send_move(client, new_player.x, new_player.y)
       end
@@ -246,7 +243,7 @@ actor GameServer
       Sform("% eats % type % at %, %, has now eaten %")(id)(eid)(eobj.typ)(eobj.x)(eobj.y)(count).print(_env.out)
       for (pn, other) in _players.pairs() do
         other.send_object_del(eid)
-        other.send_object_count(id, eid, count)
+        other.send_object_count(id, eobj.typ, count)
       end
     end
 

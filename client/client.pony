@@ -172,12 +172,14 @@ actor Game
       _objects.remove(oid)?
     end
 
-  be object_count(client: U32, oid: U16, count: U16) =>
-    if client == _player.id then
-      _player.apples = count
-    else
-      try
-        _otherponies(client)?.apples = count
+  be object_count(client: U32, otype: U16, count: U16) =>
+    if otype == Apple() then
+      if client == _player.id then
+        _player.apples = count
+      else
+        try
+          _otherponies(client)?.apples = count
+        end
       end
     end
 
@@ -375,5 +377,5 @@ class NetNotify is (TCPConnectionNotify & EventHandler)
   fun object_del(oid: U16) =>
     _game.object_del(oid)
 
-  fun object_count(client: U32, oid: U16, count: U16) =>
-    _game.object_count(client, oid, count)
+  fun object_count(client: U32, otype: U16, count: U16) =>
+    _game.object_count(client, otype, count)
