@@ -6,13 +6,6 @@ use "time"
 use "../sdl"
 use "../gamecore"
 
-
-primitive WinW fun apply(): I32 => 768
-primitive WinH fun apply(): I32 => 432
-primitive SpriteW fun apply(): I32 => 96
-primitive SpriteH fun apply(): I32 => 64
-
-
 actor Main
   new create(env:Env) =>
     let server_ip = try env.args(1)? else "::1" end
@@ -29,6 +22,7 @@ actor Game
   let _ponies: Array[Pony] = Array[Pony]
   let _player: PlayerPony
   let _otherponies: Map[U32, NetPony] = Map[U32, NetPony]
+  let _objects: Map[U16, GameObject] = Map[U16, GameObject]
   var _conn: (TCPConnection | None) = None
   var _writer: Writer
 
@@ -41,11 +35,11 @@ actor Game
     sdl.load_texture("data/pony_01.png", 1)
     sdl.load_texture("data/pony_02.png", 2)
     sdl.load_texture("data/pony_03.png", 3)
+    sdl.load_texture("data/apple.png", 4)
     let mt = MT(Time.millis())
     _player = PlayerPony
-    let rx = (mt.next() % (WinW() - (SpriteW() * 2)).u64()).abs().i32() + SpriteW()
-    let ry = (mt.next() % (WinH() - (SpriteH() * 2)).u64()).abs().i32() + SpriteH()
-    _ponies.push(Pony(rx, ry, _player))
+    let pos = SpawnPos(mt)
+    _ponies.push(Pony(pos._1, pos._2, _player))
 
     let rtimer = Timer(object iso is TimerNotify
                         let _game: Game = this
@@ -91,6 +85,9 @@ actor Game
     sdl.clear()
     sdl.set_draw_color(92, 111, 57)
     sdl.fill_rect(None)
+    for obj in _objects.values() do
+      obj.draw(sdl)
+    end
     for pony in _ponies.values() do
       pony.draw(sdl)
     end
@@ -138,6 +135,9 @@ actor Game
       | let conn: TCPConnection => conn.dispose()
     end
 
+  be welcome(id: U32) =>
+    _player.id = id
+
   be other_move(id: U32, x: I32, y: I32) =>
     if not _otherponies.contains(id) then
       let other = NetPony(id, x, y)
@@ -164,12 +164,30 @@ actor Game
       end
     end
 
+  be object_add(oid: U16, otype: U16, x: I32, y: I32) =>
+    _objects(oid) = GameObject(otype, x, y)
+
+  be object_del(oid: U16) =>
+    try
+      _objects.remove(oid)?
+    end
+
+  be object_count(client: U32, oid: U16, count: U16) =>
+    if client == _player.id then
+      _player.apples = count
+    else
+      try
+        _otherponies(client)?.apples = count
+      end
+    end
+
 
 class Pony
   var x: I32 = 0
   var y: I32 = 0
   var dir: I32 = 0 // movement dir, 0 = standing still, 1 = right, -1 = left
   var moved: Bool = false
+  var apples: U16 = 0
   var _frame: I32 = 0
   var _fcnt: I32 = 0
   var _controller: PonyController
@@ -183,6 +201,17 @@ class Pony
 
   fun draw(sdl: SDL2) =>
     let img = _controller.framebase() + _frame
+    //sdl.set_draw_color(255, 0, 0)
+    //sdl.fill_rect(recover val SDLRect(x, y, SpriteW(), SpriteH()) end)
+    if apples > 0 then
+      let w = (apples.i32() * 4).min(SpriteW())
+      if w == SpriteW() then
+        sdl.set_draw_color(0, 0, 255)
+      else
+        sdl.set_draw_color(52, 152, 219)
+      end
+      sdl.fill_rect(SDLRect(x, y - 8, w, 4))
+    end
     if dir < 0 then
       sdl.draw_texture(img, recover val SDLRect(x, y, SpriteW(), SpriteH()) end, SDLFlags.flip_horizontal())
     else
@@ -226,6 +255,22 @@ class Pony
     moved = (x' != 0) or (y' != 0)
 
 
+class GameObject
+  let typ: U16
+  var x: I32
+  var y: I32
+
+  new create(typ': U16, x': I32, y': I32) =>
+    typ = typ'
+    x = x'
+    y = y'
+
+  fun draw(sdl: SDL2) =>
+    // sdl.set_draw_color(0, 0, 255)
+    // sdl.fill_rect(recover val SDLRect(x, y, AppleW(), AppleH()) end)
+    sdl.draw_texture(4, recover val SDLRect(x, y, AppleW(), AppleH()) end)
+
+
 interface PonyController
   fun ref tick(pony: Pony)
 
@@ -240,8 +285,11 @@ class PlayerPony is PonyController
   var x: I32 = 0
   var y: I32 = 0
   var moved: Bool = false
+  var id: U32 = 0
+  var apples: U16 = 0
 
   fun ref tick(pony: Pony) =>
+    pony.apples = apples
     let dx: I32 = if left and not right then -1 elseif right and not left then 1 else 0 end
     let dy: I32 = if up and not down then -1 elseif down and not up then 1 else 0 end
     pony.walk(dx * 4, dy * 4)
@@ -259,6 +307,7 @@ class NetPony is PonyController
   var x: I32
   var y: I32
   var fresh: Bool = true
+  var apples: U16 = 0
 
   new create(id': U32, x': I32, y': I32) =>
     id = id'
@@ -266,6 +315,7 @@ class NetPony is PonyController
     y = y'
 
   fun ref tick(pony: Pony) =>
+    pony.apples = apples
     let dx = x - pony.x
     let dy = y - pony.y
     if fresh then
@@ -313,5 +363,17 @@ class NetNotify is (TCPConnectionNotify & EventHandler)
   fun moved(client: U32, x: I32, y: I32) =>
     _game.other_move(client, x, y)
 
+  fun welcome(client: U32) =>
+    _game.welcome(client)
+
   fun bye(client: U32) =>
     _game.other_bye(client)
+
+  fun object_add(oid: U16, otype: U16, x: I32, y: I32) =>
+    _game.object_add(oid, otype, x, y)
+
+  fun object_del(oid: U16) =>
+    _game.object_del(oid)
+
+  fun object_count(client: U32, oid: U16, count: U16) =>
+    _game.object_count(client, oid, count)

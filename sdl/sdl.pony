@@ -83,7 +83,7 @@ primitive _SDLTexture
 
 class SDLRect
   let rect: _SDLRect
-  new create(x1: I32, y1: I32, w1: I32, h1: I32) =>
+  new val create(x1: I32, y1: I32, w1: I32, h1: I32) =>
     rect = _SDLRect.create(x1, y1, w1, h1)
 
 
