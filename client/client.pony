@@ -204,7 +204,7 @@ class Pony
   fun draw(sdl: SDL2) =>
     let img = _controller.framebase() + _frame
     //sdl.set_draw_color(255, 0, 0)
-    //sdl.fill_rect(recover val SDLRect(x, y, SpriteW(), SpriteH()) end)
+    //sdl.fill_rect(SDLRect(x, y, SpriteW(), SpriteH()))
     if apples > 0 then
       let w = (apples.i32() * 4).min(SpriteW())
       if w == SpriteW() then
@@ -215,9 +215,9 @@ class Pony
       sdl.fill_rect(SDLRect(x, y - 8, w, 4))
     end
     if dir < 0 then
-      sdl.draw_texture(img, recover val SDLRect(x, y, SpriteW(), SpriteH()) end, SDLFlags.flip_horizontal())
+      sdl.draw_texture(img, SDLRect(x, y, SpriteW(), SpriteH()), SDLFlags.flip_horizontal())
     else
-      sdl.draw_texture(img, recover val SDLRect(x, y, SpriteW(), SpriteH()) end)
+      sdl.draw_texture(img, SDLRect(x, y, SpriteW(), SpriteH()))
     end
 
   fun ref tick() =>
@@ -269,8 +269,8 @@ class GameObject
 
   fun draw(sdl: SDL2) =>
     // sdl.set_draw_color(0, 0, 255)
-    // sdl.fill_rect(recover val SDLRect(x, y, AppleW(), AppleH()) end)
-    sdl.draw_texture(4, recover val SDLRect(x, y, AppleW(), AppleH()) end)
+    // sdl.fill_rect(SDLRect(x, y, AppleW(), AppleH()))
+    sdl.draw_texture(4, SDLRect(x, y, AppleW(), AppleH()))
 
 
 interface PonyController

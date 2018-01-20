@@ -89,8 +89,14 @@ class SDLRect
 
 class SDLTexture
   let texture: Pointer[_SDLTexture]
-  new create(texture': Pointer[_SDLTexture]) =>
+  let format: U32
+  let w: I32
+  let h: I32
+  new create(texture': Pointer[_SDLTexture], format': U32, w': I32, h': I32) =>
     texture = texture'
+    format = format'
+    w = w'
+    h = h'
 
 
 primitive SDLFlags
@@ -200,24 +206,21 @@ class SDLRenderer
     if texture.is_null() then
       error
     end
-    SDLTexture(texture)
-
-  fun ref draw_texture(texture: SDLTexture, rect: SDLRect val) =>
-    let srcrect: _SDLRect trn = recover trn _SDLRect(0, 0, 0, 0) end
+    var w: I32 = 0
+    var h: I32 = 0
     var format: U32 = 0
     var access: I32 = 0
-    @SDL_QueryTexture(texture.texture, addressof format, addressof access, addressof srcrect.w, addressof srcrect.h)
+    @SDL_QueryTexture(texture, addressof format, addressof access, addressof w, addressof h)
+    SDLTexture(texture, format, w, h)
+
+  fun ref draw_texture(texture: SDLTexture, rect: SDLRect val) =>
     @SDL_RenderCopy(renderer, texture.texture,
-    MaybePointer[_SDLRect val](consume srcrect),
+    MaybePointer[_SDLRect val](_SDLRect(0, 0, texture.w, texture.h)),
     MaybePointer[_SDLRect val](rect.rect))
 
   fun ref draw_texture_flip(texture: SDLTexture, rect: SDLRect val, flip: U32) =>
-    let srcrect: _SDLRect trn = recover trn _SDLRect(0, 0, 0, 0) end
-    var format: U32 = 0
-    var access: I32 = 0
-    @SDL_QueryTexture(texture.texture, addressof format, addressof access, addressof srcrect.w, addressof srcrect.h)
     @SDL_RenderCopyEx(renderer, texture.texture,
-    MaybePointer[_SDLRect val](consume srcrect),
+    MaybePointer[_SDLRect val](_SDLRect(0, 0, texture.w, texture.h),
     MaybePointer[_SDLRect val](rect.rect),
     0.0,
     MaybePointer[_SDLPoint val].none(),
