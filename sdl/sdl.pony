@@ -147,8 +147,10 @@ class SDL2
     window.destroy()
 
   fun ref load_texture(file: String val, id: I32) =>
-    try
-      textures.insert(id, renderer.load_texture(file)?)?
+    if not textures.contains(id) then
+      try
+        textures(id) = renderer.load_texture(file)?
+      end
     end
 
   fun ref poll_events(): Array[SDLEvent] iso^ =>
