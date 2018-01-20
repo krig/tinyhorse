@@ -24,7 +24,7 @@ struct _SDLRect
   var w: I32 = 0
   var h: I32 = 0
 
-  new create(x1: I32, y1: I32, w1: I32, h1: I32) =>
+  new val create(x1: I32, y1: I32, w1: I32, h1: I32) =>
     x = x1
     y = y1
     w = w1
@@ -82,7 +82,7 @@ primitive _SDLTexture
 
 
 class SDLRect
-  let rect: _SDLRect
+  let rect: _SDLRect val
   new val create(x1: I32, y1: I32, w1: I32, h1: I32) =>
     rect = _SDLRect.create(x1, y1, w1, h1)
 
@@ -181,7 +181,7 @@ class SDLRenderer
   var renderer: Pointer[_SDLRenderer]
 
   new create(window: SDLWindow) =>
-    renderer = @SDL_CreateRenderer(window.window, -1, SDLFlags.renderer_accelerated() or SDLFlags.renderer_presentvsync())
+    renderer = @SDL_CreateRenderer(window.window, -1, SDLFlags.renderer_accelerated())
 
   fun ref destroy() =>
     @SDL_DestroyRenderer(renderer)
@@ -215,16 +215,16 @@ class SDLRenderer
 
   fun ref draw_texture(texture: SDLTexture, rect: SDLRect val) =>
     @SDL_RenderCopy(renderer, texture.texture,
-    MaybePointer[_SDLRect val](_SDLRect(0, 0, texture.w, texture.h)),
-    MaybePointer[_SDLRect val](rect.rect))
+      MaybePointer[_SDLRect val](_SDLRect(0, 0, texture.w, texture.h)),
+      MaybePointer[_SDLRect val](rect.rect))
 
   fun ref draw_texture_flip(texture: SDLTexture, rect: SDLRect val, flip: U32) =>
     @SDL_RenderCopyEx(renderer, texture.texture,
-    MaybePointer[_SDLRect val](_SDLRect(0, 0, texture.w, texture.h),
-    MaybePointer[_SDLRect val](rect.rect),
-    0.0,
-    MaybePointer[_SDLPoint val].none(),
-    flip)
+      MaybePointer[_SDLRect val](_SDLRect(0, 0, texture.w, texture.h)),
+      MaybePointer[_SDLRect val](rect.rect),
+      0.0,
+      MaybePointer[_SDLPoint val].none(),
+      flip)
 
 
 type SDLEvent is (SDLQuit | SDLKeyUp | SDLKeyDown)
