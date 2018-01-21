@@ -1,8 +1,8 @@
 use "itertools"
 
-class Sform
+class Sform is Stringable
   let _fmt: String box
-  var _args: Array[String val] = []
+  var _args: Array[String box] = []
 
   new create(fmt: String box) =>
     _fmt = fmt
@@ -15,10 +15,10 @@ class Sform
     _args.push(arg.string())
     this
 
-  fun string(): String val^ =>
-    let buflen = _fmt.size() + Iter[String](_args.values())
+  fun string(): String iso^ =>
+    let buflen = _fmt.size() + Iter[String box](_args.values())
       .fold[USize](USize(0), {(sum, s) => sum + s.size()})
-    let buf = recover trn String(buflen) end
+    let buf = recover iso String(buflen) end
     buf.append(_fmt)
     var offset = ISize(0)
     for arg in _args.values() do
@@ -40,6 +40,3 @@ class Sform
       offset = offset + arg.size().isize()
     end
     consume buf
-
-  fun print(stream: OutStream) => stream.print(string())
-  fun write(stream: OutStream) => stream.write(string())

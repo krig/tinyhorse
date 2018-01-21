@@ -7,13 +7,6 @@ use "../sdl"
 use "../gamecore"
 
 actor Main
-  new create(env:Env) =>
-    let server_ip = try env.args(1)? else "::1" end
-    let server_port = try env.args(2)? else "6000" end
-    Game(env, server_ip, server_port)
-
-
-actor Game
   let env: Env
   let sdl: SDL2
   let timers: Timers = Timers
@@ -26,11 +19,12 @@ actor Game
   var _conn: (TCPConnection | None) = None
   var _writer: Writer
 
-  new create(env': Env, server_ip: String val, server_port: String val) =>
+  new create(env': Env) =>
     env = env'
     _writer = Writer
     sdl = SDL2(SDLFlags.init_video(), "tiny horse", WinW(), WinH())
-
+    let server_ip = try env.args(1)? else "::1" end
+    let server_port = try env.args(2)? else "6000" end
     sdl.load_texture("data/pony_00.png", 0)
     sdl.load_texture("data/pony_01.png", 1)
     sdl.load_texture("data/pony_02.png", 2)
@@ -42,7 +36,7 @@ actor Game
     _ponies.push(Pony(pos._1, pos._2, _player))
 
     let rtimer = Timer(object iso is TimerNotify
-                        let _game: Game = this
+                        let _game: Main = this
                         fun ref apply(timer:Timer, count:U64):Bool =>
                           _game.render()
                           true
@@ -51,7 +45,7 @@ actor Game
     timers(consume rtimer)
 
     let ttimer = Timer(object iso is TimerNotify
-                        let _game: Game = this
+                        let _game: Main = this
                         fun ref apply(timer:Timer, count:U64):Bool =>
                           _game.tick()
                           true
@@ -338,10 +332,10 @@ class NetPony is PonyController
 
 class NetNotify is (TCPConnectionNotify & EventHandler)
   let _env: Env
-  let _game: Game
+  let _game: Main
   var _buf: Reader
 
-  new iso create(env: Env, game: Game) =>
+  new iso create(env: Env, game: Main) =>
     _env = env
     _game = game
     _buf = Reader
@@ -349,7 +343,7 @@ class NetNotify is (TCPConnectionNotify & EventHandler)
   fun ref connected(conn: TCPConnection ref) =>
     try
       let who = conn.remote_address().name()?
-      Sform("Connected to %:%")(who._1)(who._2).print(_env.out)
+      _env.out.print(Sform("Connected to %:%")(who._1)(who._2).string())
     end
     conn.set_keepalive(30)
     _game.connected(conn)
