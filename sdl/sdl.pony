@@ -2,6 +2,7 @@ use "lib:SDL2"
 use "lib:SDL2_image"
 use "collections"
 
+
 use @SDL_Init[I32](flags: U32)
 use @SDL_CreateWindow[Pointer[_SDLWindow]](title: Pointer[U8] tag, x: I32, y: I32, w: I32, h: I32, flags: U32)
 use @SDL_CreateRenderer[Pointer[_SDLRenderer]](window: Pointer[_SDLWindow], index: I32, flags: U32)
@@ -16,6 +17,21 @@ use @SDL_QueryTexture[I32](texture: Pointer[_SDLTexture], format: Pointer[U32], 
 use @SDL_PollEvent[I32](event: MaybePointer[_SDLKeyboardEvent])
 use @SDL_RenderCopy[I32](renderer: Pointer[_SDLRenderer], texture: Pointer[_SDLTexture], srcrect: MaybePointer[_SDLRect val], dstrect: MaybePointer[_SDLRect val])
 use @SDL_RenderCopyEx[I32](renderer: Pointer[_SDLRenderer], texture: Pointer[_SDLTexture], srcrect: MaybePointer[_SDLRect val], dstrect: MaybePointer[_SDLRect val], angle: F64, center: MaybePointer[_SDLPoint val], flip: U32)
+
+
+primitive _SDLWindow
+primitive _SDLRenderer
+primitive _SDLTexture
+
+primitive SDLFlags
+  fun init_video(): U32 => 0x00000020
+  fun window_shown(): U32 => 0x00000004
+  fun renderer_accelerated(): U32 => 0x00000002
+  fun renderer_presentvsync(): U32 => 0x00000004
+
+  fun flip_none(): U32 => 0x0
+  fun flip_horizontal(): U32 => 0x1
+  fun flip_vertical(): U32 => 0x2
 
 
 struct _SDLRect
@@ -76,11 +92,6 @@ primitive SDLKeyCodes
   fun up(): U32 => (1 << 30) + 82
 
 
-primitive _SDLWindow
-primitive _SDLRenderer
-primitive _SDLTexture
-
-
 class SDLRect
   embed rect: _SDLRect val
   new val create(x1: I32, y1: I32, w1: I32, h1: I32) =>
@@ -99,21 +110,10 @@ class SDLTexture
     h = h'
 
 
-primitive SDLFlags
-  fun init_video(): U32 => 0x00000020
-  fun window_shown(): U32 => 0x00000004
-  fun renderer_accelerated(): U32 => 0x00000002
-  fun renderer_presentvsync(): U32 => 0x00000004
-
-  fun flip_none(): U32 => 0x0
-  fun flip_horizontal(): U32 => 0x1
-  fun flip_vertical(): U32 => 0x2
-
-
 class SDL2
   var window: SDLWindow
   var renderer: SDLRenderer
-  var textures: Map[I32, SDLTexture] = Map[I32, SDLTexture]
+  embed textures: Map[I32, SDLTexture] = Map[I32, SDLTexture]
 
   new create(flags: U32, title: String val, w: I32 = 640, h: I32 = 480) =>
     @SDL_Init(flags)
