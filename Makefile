@@ -1,25 +1,38 @@
 PONYCFLAGS =
+GAMECORESRC = gamecore/constants.pony gamecore/events.pony gamecore/sform.pony gamecore/utils.pony
+SDLSRC = sdl/sdl.pony sdl/_test.pony
+CLIENTSRC = client/client.pony
+SERVERSRC = server/server.pony
+MKDIR_P = mkdir -p
 
-.PHONY: test all clean
+.PHONY: test all clean debug directories
 
-all: build/client build/server
+all: directories build/client build/server
 
 debug: PONYCFLAGS += --debug
-debug: build/client build/server build/sdl
+debug: build/clientd build/serverd
 
-build/client: build client/*.pony
+build/client: $(CLIENTSRC) $(GAMECORESRC) $(SDLSRC)
 	ponyc client -o build $(PONYCFLAGS)
 
-build/server: build server/*.pony
+build/server: $(SERVERSRC) $(GAMECORESRC)
 	ponyc server -o build $(PONYCFLAGS)
 
-build/sdl: build sdl/*.pony
-	ponyc sdl -o build $(PONYCFLAGS)
+build/clientd: $(CLIENTSRC) $(GAMECORESRC) $(SDLSRC)
+	ponyc client -o build -b clientd $(PONYCFLAGS)
+
+build/serverd: $(SERVERSRC) $(GAMECORESRC)
+	ponyc server -o build -b serverd $(PONYCFLAGS)
+
+build/sdl: $(SDLSRC)
+	ponyc sdl -o build --debug
+
+directories: build
 
 build:
-	mkdir build
+	${MKDIR_P} build
 
-test: debug
+test: build/sdl
 	build/sdl
 
 clean:
