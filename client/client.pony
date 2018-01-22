@@ -14,8 +14,8 @@ actor Main
   let tick_loop: Timer tag
   let _ponies: Array[Pony] = Array[Pony]
   let _player: PlayerPony
-  let _otherponies: Map[U32, NetPony] = Map[U32, NetPony]
-  let _objects: Map[U16, GameObject] = Map[U16, GameObject]
+  let _netcontrollers: Map[U32, NetPony] = Map[U32, NetPony]
+  let _objects: Array[GameObject] = Array[GameObject]
   var _conn: (TCPConnection | None) = None
   var _writer: Writer
 
@@ -133,21 +133,21 @@ actor Main
     _player.id = id
 
   be other_move(id: U32, x: I32, y: I32) =>
-    if not _otherponies.contains(id) then
+    if not _netcontrollers.contains(id) then
       let other = NetPony(id, x, y)
       try
-        _otherponies.insert(id, other)?
+        _netcontrollers.insert(id, other)?
         _ponies.push(Pony(x, y, other))
       end
     else
       try
-        _otherponies(id)?.move(x, y)
+        _netcontrollers(id)?.move(x, y)
       end
     end
 
   be other_bye(id: U32) =>
     try
-      (_, let other) = _otherponies.remove(id)?
+      (_, let other) = _netcontrollers.remove(id)?
       var i: USize = 0
       while i < _ponies.size() do
         if _ponies(i)?.brain() is other then
@@ -159,11 +159,12 @@ actor Main
     end
 
   be object_add(oid: U16, otype: U16, x: I32, y: I32) =>
-    _objects(oid) = GameObject(otype, x, y)
+    _objects.push(GameObject(oid, otype, x, y))
 
   be object_del(oid: U16) =>
     try
-      _objects.remove(oid)?
+      ArrayUtils.del_in_place[GameObject](_objects,
+        ArrayUtils.find_if[GameObject](_objects, {(item) => item.id == oid})?)?
     end
 
   be object_count(client: U32, otype: U16, count: U16) =>
@@ -172,7 +173,7 @@ actor Main
         _player.apples = count
       else
         try
-          _otherponies(client)?.apples = count
+          _netcontrollers(client)?.apples = count
         end
       end
     end
@@ -252,11 +253,13 @@ class Pony
 
 
 class GameObject
+  let id: U16
   let typ: U16
   var x: I32
   var y: I32
 
-  new create(typ': U16, x': I32, y': I32) =>
+  new create(id': U16, typ': U16, x': I32, y': I32) =>
+    id = id'
     typ = typ'
     x = x'
     y = y'
