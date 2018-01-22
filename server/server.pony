@@ -53,7 +53,7 @@ actor Main
       env.exitcode(1)
     end
 
-  fun ref next_spawn(): U64 => Nanos.from_seconds(3) + (_mt.next() % Nanos.from_seconds(8))
+  fun ref next_spawn(): U64 => Nanos.from_seconds(1) + (_mt.next() % Nanos.from_seconds(5))
 
   be spawn() =>
     if _objects.size() < MaxObjs() then
