@@ -53,9 +53,12 @@ actor Main
     tick_loop = ttimer
     timers(consume ttimer)
 
-    // setup network
     try
-      _conn = TCPConnection(env.root as AmbientAuth, NetNotify(env, this), server_ip, server_port)
+      let auth = TCPAuth(env.root as AmbientAuth)
+      _conn = TCPConnection(auth, NetNotify(env, this), server_ip, server_port)
+    else
+      env.exitcode(1)
+      return
     end
 
   be tick() =>
@@ -76,9 +79,7 @@ actor Main
     end
 
   be render() =>
-    sdl.clear()
-    sdl.set_draw_color(92, 111, 57)
-    sdl.fill_rect(None)
+    sdl.>clear().>set_draw_color(92, 111, 57).>fill_rect()
     for obj in _objects.values() do
       obj.draw(sdl)
     end

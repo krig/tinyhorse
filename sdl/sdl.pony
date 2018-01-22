@@ -126,7 +126,7 @@ class SDL2
   fun ref set_draw_color(r: U8, g: U8, b: U8, a: U8 = 255) =>
     renderer.set_draw_color(r, g, b, a)
 
-  fun ref fill_rect(rect: (SDLRect val | None)) =>
+  fun ref fill_rect(rect: (SDLRect val | None) = None) =>
     renderer.fill_rect(rect)
 
   fun ref draw_texture(id: I32, rect: SDLRect val, flip: U32 = SDLFlags.flip_none()) =>
