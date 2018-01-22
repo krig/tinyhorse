@@ -1,6 +1,10 @@
 // various utility things
 
 class ArrayUtils
+  // Delete in place: Will swap the element to be
+  // deleted into the last position, and then pop
+  // that off the array in order to minimize
+  // allocations.
   fun del_in_place[A](array: Array[A], i: USize) ? =>
     if i >= array.size() then error end
     try
