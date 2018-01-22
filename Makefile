@@ -10,7 +10,7 @@ MKDIR_P = mkdir -p
 all: directories build/client build/server
 
 debug: PONYCFLAGS += --debug
-debug: build/clientd build/serverd
+debug: directories build/clientd build/serverd
 
 build/client: $(CLIENTSRC) $(GAMECORESRC) $(SDLSRC)
 	ponyc client -o build $(PONYCFLAGS)
