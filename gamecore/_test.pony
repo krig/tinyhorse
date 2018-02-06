@@ -31,7 +31,7 @@ class iso _TestArrayUtils is UnitTest
 
   fun apply(h: TestHelper) =>
     let a: Array[I32] = [1; 4; 2; 9; 100; -10; 0; -2]
-    let idx = try ArrayUtils.find_if[I32](a, {(e) => e < 0})? else 0 end
+    let idx = try ArrayUtils.find_if[I32](a, {(e) => e < 0}) as USize else 0 end
     h.assert_eq[USize](idx, 5)
     try ArrayUtils.del_in_place[I32](a, 3)? end
     h.assert_array_eq[I32]([1; 4; 2; -2; 100; -10; 0], a)

@@ -163,9 +163,8 @@ actor Main
     _objects.push(GameObject(oid, otype, x, y))
 
   be object_del(oid: U16) =>
-    try
-      ArrayUtils.del_in_place[GameObject](_objects,
-        ArrayUtils.find_if[GameObject](_objects, {(item) => item.id == oid})?)?
+    match ArrayUtils.find_if[GameObject](_objects, {(item) => item.id == oid})
+      | let i: USize => try ArrayUtils.del_in_place[GameObject](_objects, i)? end
     end
 
   be object_count(client: U32, otype: U16, count: U16) =>

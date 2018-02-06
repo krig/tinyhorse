@@ -26,11 +26,11 @@ class ArrayUtils
 
   // find_if: Return the index of the first element
   // in the array which satisfies the predicate.
-  fun find_if[A](array: Array[A] box, predicate: {(box->A!): Bool} val): USize ? =>
+  fun find_if[A](array: Array[A] box, predicate: {(box->A!): Bool} val): (USize | None) =>
     for (i, elem) in array.pairs() do
       if predicate(elem) then
         return i
       end
     end
-    error
+    None
 
