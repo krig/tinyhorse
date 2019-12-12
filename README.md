@@ -1,6 +1,6 @@
 # tiny horse
 
-[![CircleCI](https://circleci.com/gh/superherointj/tinyhorse/tree/master.svg?style=svg)](https://circleci.com/gh/superherointj/tinyhorse/tree/master)
+[![CircleCI](https://circleci.com/gh/krig/tinyhorse/tree/master.svg?style=svg)](https://circleci.com/gh/krig/tinyhorse/tree/master)
 
 !["screenshot"](https://github.com/krig/tinyhorse/raw/master/data/tinyhorse.jpg "screenshot")
 
