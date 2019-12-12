@@ -1,5 +1,7 @@
 # tiny horse
 
+[![CircleCI](https://circleci.com/gh/superherointj/tinyhorse/tree/master.svg?style=svg)](https://circleci.com/gh/superherointj/tinyhorse/tree/master)
+
 !["screenshot"](https://github.com/krig/tinyhorse/raw/master/data/tinyhorse.jpg "screenshot")
 
 A multiplayer "game" written as a small example of pony.
