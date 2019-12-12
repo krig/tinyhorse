@@ -1,9 +1,8 @@
 version: 2.1
-  jobs:
-    build:
-      parallelism: 1
-        docker:
-          - image: superherointj/archlinux-ponylang-sdl:latest
-            steps:
-              - checkout
-              - run: make
+jobs:
+  build:
+    docker:
+      - image: superherointj/archlinux-ponylang-sdl:latest
+        steps:
+          - checkout
+          - run: make
