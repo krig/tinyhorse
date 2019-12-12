@@ -41,3 +41,6 @@ test: build/sdl build/gamecore
 
 clean:
 	rm -rf build
+
+# docker:
+# 	docker build -t tinyhorse .

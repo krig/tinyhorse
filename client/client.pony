@@ -136,10 +136,8 @@ actor Main
   be other_move(id: U32, x: I32, y: I32) =>
     if not _netcontrollers.contains(id) then
       let other = NetPony(id, x, y)
-      try
-        _netcontrollers.insert(id, other)?
-        _ponies.push(Pony(x, y, other))
-      end
+      _netcontrollers.insert(id, other)
+      _ponies.push(Pony(x, y, other))
     else
       try
         _netcontrollers(id)?.move(x, y)

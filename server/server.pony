@@ -75,7 +75,6 @@ actor Main
       end, next_spawn()))
 
   be connect(client: U32, conn: TCPConnection tag) =>
-    try
       _env.out.print("New player: " + client.string())
       var new_player = Player(conn)
 
@@ -92,10 +91,7 @@ actor Main
         player.send_move(client, new_player.x, new_player.y)
       end
 
-      _players.insert(client, new_player)?
-    else
-      _env.out.print("Failed to connect new player " + client.string())
-    end
+      _players.insert(client, new_player)
 
   be move(client: U32, x: I32, y: I32) =>
     try

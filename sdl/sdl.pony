@@ -11,12 +11,12 @@ use @SDL_DestroyWindow[None](window: Pointer[_SDLWindow])
 use @SDL_RenderClear[I32](renderer: Pointer[_SDLRenderer])
 use @SDL_RenderPresent[None](renderer: Pointer[_SDLRenderer])
 use @SDL_SetRenderDrawColor[I32](renderer: Pointer[_SDLRenderer], r: U8, g: U8, b: U8, a: U8)
-use @SDL_RenderFillRect[I32](renderer: Pointer[_SDLRenderer], rect: MaybePointer[_SDLRect val])
+use @SDL_RenderFillRect[I32](renderer: Pointer[_SDLRenderer], rect: NullablePointer[_SDLRect val])
 use @IMG_LoadTexture[Pointer[_SDLTexture]](renderer: Pointer[_SDLRenderer], file: Pointer[U8] tag)
 use @SDL_QueryTexture[I32](texture: Pointer[_SDLTexture], format: Pointer[U32], access: Pointer[I32], w: Pointer[I32], h: Pointer[I32])
-use @SDL_PollEvent[I32](event: MaybePointer[_SDLKeyboardEvent])
-use @SDL_RenderCopy[I32](renderer: Pointer[_SDLRenderer], texture: Pointer[_SDLTexture], srcrect: MaybePointer[_SDLRect val], dstrect: MaybePointer[_SDLRect val])
-use @SDL_RenderCopyEx[I32](renderer: Pointer[_SDLRenderer], texture: Pointer[_SDLTexture], srcrect: MaybePointer[_SDLRect val], dstrect: MaybePointer[_SDLRect val], angle: F64, center: MaybePointer[_SDLPoint val], flip: U32)
+use @SDL_PollEvent[I32](event: NullablePointer[_SDLKeyboardEvent])
+use @SDL_RenderCopy[I32](renderer: Pointer[_SDLRenderer], texture: Pointer[_SDLTexture], srcrect: NullablePointer[_SDLRect val], dstrect: NullablePointer[_SDLRect val])
+use @SDL_RenderCopyEx[I32](renderer: Pointer[_SDLRenderer], texture: Pointer[_SDLTexture], srcrect: NullablePointer[_SDLRect val], dstrect: NullablePointer[_SDLRect val], angle: F64, center: NullablePointer[_SDLPoint val], flip: U32)
 
 
 primitive _SDLWindow
@@ -157,14 +157,14 @@ class SDL2
     let events: Array[SDLEvent] iso = []
     var e: _SDLKeyboardEvent ref = _SDLKeyboardEvent
     var rc: I32 = 0
-    rc = @SDL_PollEvent(MaybePointer[_SDLKeyboardEvent](e))
+    rc = @SDL_PollEvent(NullablePointer[_SDLKeyboardEvent](e))
     while rc != 0 do
       match e.type1
         | _SDLEvents.quit() => events.push(SDLQuit)
         | _SDLEvents.keydown() => if e.repeat1 == 0 then events.push(SDLKeyDown(e.sym)) end
         | _SDLEvents.keyup() => if e.repeat1 == 0 then events.push(SDLKeyUp(e.sym)) end
       end
-      rc = @SDL_PollEvent(MaybePointer[_SDLKeyboardEvent](e))
+      rc = @SDL_PollEvent(NullablePointer[_SDLKeyboardEvent](e))
     end
     consume events
 
@@ -196,8 +196,8 @@ class SDLRenderer
 
   fun ref fill_rect(rect: (SDLRect val | None)) =>
     match rect
-      | None => @SDL_RenderFillRect(renderer, MaybePointer[_SDLRect val].none())
-      | let r: SDLRect val => @SDL_RenderFillRect(renderer, MaybePointer[_SDLRect val](r.rect))
+      | None => @SDL_RenderFillRect(renderer, NullablePointer[_SDLRect val].none())
+      | let r: SDLRect val => @SDL_RenderFillRect(renderer, NullablePointer[_SDLRect val](r.rect))
     end
 
   fun ref present() =>
@@ -217,15 +217,15 @@ class SDLRenderer
 
   fun ref draw_texture(texture: SDLTexture, rect: SDLRect val) =>
     @SDL_RenderCopy(renderer, texture.texture,
-      MaybePointer[_SDLRect val](_SDLRect(0, 0, texture.w, texture.h)),
-      MaybePointer[_SDLRect val](rect.rect))
+      NullablePointer[_SDLRect val](_SDLRect(0, 0, texture.w, texture.h)),
+      NullablePointer[_SDLRect val](rect.rect))
 
   fun ref draw_texture_flip(texture: SDLTexture, rect: SDLRect val, flip: U32) =>
     @SDL_RenderCopyEx(renderer, texture.texture,
-      MaybePointer[_SDLRect val](_SDLRect(0, 0, texture.w, texture.h)),
-      MaybePointer[_SDLRect val](rect.rect),
+      NullablePointer[_SDLRect val](_SDLRect(0, 0, texture.w, texture.h)),
+      NullablePointer[_SDLRect val](rect.rect),
       0.0,
-      MaybePointer[_SDLPoint val].none(),
+      NullablePointer[_SDLPoint val].none(),
       flip)
 
 
